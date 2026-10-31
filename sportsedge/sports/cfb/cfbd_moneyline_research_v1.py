@@ -65,7 +65,9 @@ def normalize_moneyline_research(games: list[dict] | None) -> dict:
         gid = _game_key(game)
         if gid in out:
             raise ValueError("CFB_ML_RESEARCH_GAME_DUPLICATE")
-        lines = game.get("lines") or []
+        lines = game.get("lines", [])
+        if lines is None:
+            lines = []
         if not isinstance(lines, list):
             raise ValueError("CFB_ML_RESEARCH_LINES_LIST_REQUIRED")
         pairs_by_provider: dict[str, dict] = {}
