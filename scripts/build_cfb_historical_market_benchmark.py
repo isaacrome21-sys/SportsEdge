@@ -13,7 +13,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from sportsedge.sports.cfb.history_cache import cache_market_archive, iter_market_archive
+from sportsedge.sports.cfb.history_cache import cache_market_archive
+from sportsedge.sports.cfb.market_archive import iter_market_archive
 from sportsedge.sports.cfb.market_benchmark import build_historical_market_benchmark
 
 
@@ -24,10 +25,15 @@ def build(*, contract_path: Path, cache_root: Path, output_path: Path) -> dict:
     cached = cache_market_archive(
         contract_path=contract_path,
         cache_root=cache_root,
+        use="historical_market_coverage_profiling",
         allow_benchmark=True,
     )
     report = build_historical_market_benchmark(
-        iter_market_archive(contract_path=contract_path, cache_file=cached["cache_file"]),
+        iter_market_archive(
+            contract_path=contract_path,
+            cache_file=cached["cache_file"],
+            use="historical_market_coverage_profiling",
+        ),
         source_sha256=str(upstream.get("expected_sha256") or ""),
         expected_row_count=int(profile.get("row_count") or 0),
     )
