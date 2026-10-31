@@ -163,6 +163,23 @@ def _closing_quote(play: dict, closing_board: list, *,
     """
     if not verified_receipt_shas:
         return None
+    # Entry and close BOTH need independently allowlisted rendered receipts.
+    entry_sha = play.get("entry_receipt_sha256")
+    entry_source_sha = play.get("entry_source_sha256")
+    if (not isinstance(entry_sha, str)
+            or re.fullmatch(r"[0-9a-f]{64}", entry_sha) is None
+            or entry_sha not in verified_receipt_shas
+            or not isinstance(entry_source_sha, str)
+            or re.fullmatch(r"[0-9a-f]{64}", entry_source_sha) is None
+            or play.get("entry_provider") != "DraftKings"
+            or play.get("entry_source_type") != "rendered_browser"):
+        return None
+    try:
+        entry_captured = _utc(play["entry_captured_at_utc"])
+        if entry_captured >= _utc(play["start_ts"]):
+            return None
+    except (KeyError, ValueError, TypeError):
+        return None
     matches = []
     for g in closing_board:
         if not isinstance(g, dict):
@@ -188,25 +205,25 @@ def _closing_quote(play: dict, closing_board: list, *,
                 continue
             captured = _utc(g["captured_at_utc"])
             cutoff = _utc(g["authorized_close_cutoff_utc"])
-            if not captured <= cutoff <= kickoff:
+            if not entry_captured < captured <= cutoff <= kickoff:
                 continue
             flipped = _norm(g["away"]) != _norm(play["away"])
             m, s = play["market"], play["side"]
-            if m == "TOTAL" and g.get("total") is not None:
+            if m == "TOTAL" and s in ("OVER", "UNDER") and g.get("total") is not None:
                 line, over, under = g["total"]
-                if abs(float(line) - float(play["line"])) > 1e-9:
+                if isinstance(line, bool) or not math.isfinite(float(line)) or abs(float(line) - float(play["line"])) > 1e-9:
                     continue
                 mine, opp = ((over, under) if s == "OVER" else (under, over))
-            elif m == "SPREAD" and g.get("spread") is not None:
+            elif m == "SPREAD" and s in ("AWAY", "HOME") and g.get("spread") is not None:
                 away_line, away_odds, home_odds = g["spread"]
                 if flipped:
                     away_line, away_odds, home_odds = -float(away_line), home_odds, away_odds
                 my_line = float(away_line) if s == "AWAY" else -float(away_line)
-                if abs(my_line - float(play["line"])) > 1e-9:
+                if not math.isfinite(my_line) or abs(my_line - float(play["line"])) > 1e-9:
                     continue
                 mine, opp = ((away_odds, home_odds) if s == "AWAY"
                              else (home_odds, away_odds))
-            elif m == "MONEYLINE" and g.get("ml") is not None:
+            elif m == "MONEYLINE" and s in ("AWAY", "HOME") and g.get("ml") is not None:
                 away_odds, home_odds = g["ml"]
                 if flipped:
                     away_odds, home_odds = home_odds, away_odds
