@@ -94,7 +94,7 @@ MARKETS = ("SPREAD", "TOTAL")
 EMBARGO_HOURS = 24  # feature game available 24h after its kickoff
 
 ADJUSTMENT_TOLERANCE = 1e-6  # opponent-adjustment iteration tolerance
-ADJUSTMENT_MAX_ITERATIONS = 500
+ADJUSTMENT_MAX_ITERATIONS = 20000
 ADJUSTMENT_DAMPING = 0.5
 
 PRIOR_PSEUDO_GAMES = 3.0  # preseason prior weight, in games

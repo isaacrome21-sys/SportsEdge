@@ -24,7 +24,7 @@ grade, they do not gate.
 | Member | Path | sha256 |
 | --- | --- | --- |
 | Preregistration document | `research/cfb_game_epa_joint_v1_20261031/PREREG_DRAFT_V2.md` | `cf9a61bfbbbe0138ee670966ed0f8eb714a199fa133d033864b518d6554e94eb` |
-| §1 implementation (construction + snapshot machinery) | `sportsedge/cfb_game_epa_joint_v1.py` | `87f585c81e434f870bcd9490b6c4ad5ed477871e23d3152b2e349ccce974825d` |
+| §1 implementation (construction + snapshot machinery) | `sportsedge/cfb_game_epa_joint_v1.py` | `f943a3a7bbf752c76d0bbe25e057934f978e78286c5c9c9bb3e1947fddacd184` |
 | §2.1 baseline evaluator | `scripts/evaluate_cfb_sdv_closes.py` | `d4ca6f537233b201a8c999c5919023cd46b50fcb61fc0382de9426c667ecb32c` |
 | §2.1 baseline, CFB branch | `artifacts/free_models.py` | `a8abf4606acafd2405ec037ea3bf69f1a6a5168baa4750631cc0fbebcece1fa3` |
 
@@ -69,7 +69,7 @@ the build (BUILD_RECORD flag 15).
 | Constant | Value |
 | --- | --- |
 | `ADJUSTMENT_TOLERANCE` | 1e-6 |
-| `ADJUSTMENT_MAX_ITERATIONS` | 500 (fail-closed `OPPONENT_ADJUSTMENT_NOT_CONVERGED` beyond) |
+| `ADJUSTMENT_MAX_ITERATIONS` | 20000 (fail-closed `OPPONENT_ADJUSTMENT_NOT_CONVERGED` beyond; raised from 500 — see §7) |
 | `ADJUSTMENT_DAMPING` | 0.5 (damped Jacobi) |
 
 **Shrinkage / prior (§1):**
@@ -198,6 +198,16 @@ disposition set above is complete as built.
    Saturday after the freeze through that season's bowl + CFP games,
    extending season-by-season until 300 graded games per market).
    No game counts before the act; no retroactive counting after it.
+
+## 7. Iteration-cap amendment (owner ruling "Fix", Oct 31, 2026) — this head re-pins
+
+`ADJUSTMENT_MAX_ITERATIONS` raised **500 → 20000**. One constant; no other line of the implementation changes. The implementation digest in §1 is re-struck over the amended file (`f943a3a7…`, was `87f585c8…`); the other three §7 pins are unchanged. Head movement reopens item 6 on the new head.
+
+**Why it cannot change a validated number:** the cap is a refusal threshold. A fit that converges exits on the 1e-6 tolerance test at the same iteration and the same values under any cap at or above that iteration count; the cap only decides whether a slow fit refuses or finishes.
+
+**Why it was needed:** at 500 the construction refused whole slates on sparse early-season opponent graphs. Measured on 2025 design data (Claude lane run, PR #2976): weeks 3 and 4 refused at 500; week 4 clears by 1,500; week 3 needs between 3,500 and 4,500. Rocky's probes: realistic clustered 130-team schedules needed 717 / 520 iterations through weeks 2 / 3; worst adversarial case (60-team chain) needs 14,067. Cost 0.35 ms per iteration on a 130-team fit — a snapshot grinding the full cap on all five stats is ~35 s, once.
+
+**Why 20000:** about 4x the worst observed real case and above the worst adversarial case; a 5000 cap would sit within ~10–30% of the real week-3 demand.
 
 *Prepared Oct 31, 2026 (Rocky), checklist item 5, from
 PREREG_DRAFT_V2 §§5.3/7, the landed implementation, and the

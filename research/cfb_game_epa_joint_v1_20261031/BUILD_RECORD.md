@@ -130,6 +130,8 @@ only and was **not** created.
 | `EMBARGO_HOURS` | 24 | V2 §1 (24h availability/embargo) |
 | `ADJUSTMENT_TOLERANCE` | 1e-6 | V2 §1 "iteration to a stated tolerance" — value chosen here, flagged |
 | `ADJUSTMENT_MAX_ITERATIONS` | 500 | build choice, fail-closed beyond |
+
+*Amendment (Oct 31, 2026): raised to 20000 before the freeze — see FREEZE_RECORD.md §7. The value above is the as-built history.*
 | `ADJUSTMENT_DAMPING` | 0.5 | build choice (Jacobi damping) |
 | `PRIOR_PSEUDO_GAMES` | 3.0 | build choice (prior weight in games), flagged |
 | `PRIOR_SEASON_RETENTION` | 0.65 | build choice (prior-season retention), flagged |
