@@ -1084,8 +1084,12 @@ class PredictionLedger:
 
 # ------------------------------------------------------------------
 # Freeze record + verdict ledger. A FreezeRecord is supplied by
-# the freeze act (checklist items 5-7); this build defines only
-# its shape and validation. FREEZE_STATE in this module stays
+# the freeze act (checklist items 5-7); this module defines its
+# shape and validation, completed at checklist item 5 to carry the
+# full section-7 pin set: the preregistration, the implementation
+# (which contains the snapshot machinery), the section-2.1 baseline
+# evaluator script, and the CFB branch of
+# artifacts/free_models.py. FREEZE_STATE in this module stays
 # DRAFT_NOT_IN_FORCE regardless: the act is external.
 # ------------------------------------------------------------------
 
@@ -1097,13 +1101,17 @@ class FreezeRecord:
     k_at_freeze: int
     prereg_sha256: str
     implementation_sha256: str
+    evaluator_script_sha256: str
+    free_models_sha256: str
 
     def __post_init__(self) -> None:
         _require_ts(self.frozen_at, "FREEZE_TIMESTAMP_INVALID")
         if len(self.freeze_commit_sha) != 40 or any(
                 c not in "0123456789abcdef" for c in self.freeze_commit_sha):
             raise CfbEpaError("FREEZE_RECORD_INVALID", "freeze_commit_sha")
-        for digest in (self.prereg_sha256, self.implementation_sha256):
+        for digest in (self.prereg_sha256, self.implementation_sha256,
+                       self.evaluator_script_sha256,
+                       self.free_models_sha256):
             if len(digest) != 64 or any(
                     c not in "0123456789abcdef" for c in digest):
                 raise CfbEpaError("FREEZE_RECORD_INVALID", "sha256 pin")

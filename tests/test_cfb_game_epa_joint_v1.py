@@ -89,7 +89,9 @@ def _freeze_record(k=12):
         freeze_commit_sha="b" * 40,
         frozen_at=datetime(2026, 10, 30, 12, 0, tzinfo=UTC),
         k_at_freeze=k, prereg_sha256="a" * 64,
-        implementation_sha256="c" * 64)
+        implementation_sha256="c" * 64,
+        evaluator_script_sha256="d" * 64,
+        free_models_sha256="e" * 64)
 
 
 def _counted_sample(n_games=12, model_offset=10.0, pm_offset=0.0,
@@ -790,7 +792,9 @@ def test_freeze_record_validation():
     with pytest.raises(CfbEpaError):
         FreezeRecord(freeze_commit_sha="zz", frozen_at=KICK,
                      k_at_freeze=12, prereg_sha256="a" * 64,
-                     implementation_sha256="c" * 64)
+                     implementation_sha256="c" * 64,
+                     evaluator_script_sha256="d" * 64,
+                     free_models_sha256="e" * 64)
 
 
 # ------------------------------------------------------------------
