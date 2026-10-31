@@ -69,7 +69,7 @@ def test_current_repo_has_four_frozen_pinned_v2_configs():
     states = report["forward_config_states"]["NBA"]
     assert states.get("FINAL_CANDIDATE_NOT_FROZEN", 0) == 0
     rows = [r for r in report["forward_family_configs"]
-            if r["file"].endswith("_v2.json")]
+            if r["file"].endswith("_v2.json") and r["sport"] == "NBA"]
     assert len(rows) == 4
     assert all(r["state"] == "FROZEN_NO_VERDICT_ATTACHED" for r in rows)
     assert report["validated_families_conferred"] == 0
