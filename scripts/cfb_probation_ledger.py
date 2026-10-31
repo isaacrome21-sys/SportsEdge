@@ -152,35 +152,80 @@ def settle(play: dict, away_pts: float, home_pts: float) -> str:
     return "PUSH" if abs(diff) < 1e-9 else ("WIN" if diff > 0 else "LOSS")
 
 
-def _closing_quote(play: dict, closing_board: list):
-    """Return (odds, opposite_odds) for the exact original contract, else None."""
+def _closing_quote(play: dict, closing_board: list, *,
+                   verified_receipt_shas: frozenset[str] | None = None):
+    """Find one exact close only from externally verified rendered receipts.
+
+    Caller must supply an allowlist of receipt SHA256s established by a
+    separately audited immutable source/archive verifier. Row-supplied flags
+    and hashes alone are not authentication. The grade CLI does not supply
+    this allowlist, so legacy closing boards never generate CLV.
+    """
+    if not verified_receipt_shas:
+        return None
+    matches = []
     for g in closing_board:
-        if {_norm(g.get("away", "")), _norm(g.get("home", ""))} != {_norm(play["away"]), _norm(play["home"])}:
+        if not isinstance(g, dict):
             continue
-        flipped = _norm(g.get("away", "")) != _norm(play["away"])
-        m, s = play["market"], play["side"]
-        if m == "TOTAL" and g.get("total"):
-            line, over, under = g["total"]
-            if abs(float(line) - play["line"]) > 1e-9:
-                return None
-            return (over, under) if s == "OVER" else (under, over)
-        if m == "SPREAD" and g.get("spread"):
-            away_line, away_odds, home_odds = g["spread"]
-            if flipped:
-                away_line, away_odds, home_odds = -float(away_line), home_odds, away_odds
-            my_line = float(away_line) if s == "AWAY" else -float(away_line)
-            if abs(my_line - play["line"]) > 1e-9:
-                return None
-            return (away_odds, home_odds) if s == "AWAY" else (home_odds, away_odds)
-        if m == "MONEYLINE" and g.get("ml"):
-            a, h = g["ml"]
-            if flipped:
-                a, h = h, a
-            return (a, h) if s == "AWAY" else (h, a)
-    return None
+        receipt_sha = g.get("receipt_sha256")
+        source_sha = g.get("source_sha256")
+        if (not isinstance(receipt_sha, str)
+                or re.fullmatch(r"[0-9a-f]{64}", receipt_sha) is None
+                or receipt_sha not in verified_receipt_shas
+                or not isinstance(source_sha, str)
+                or re.fullmatch(r"[0-9a-f]{64}", source_sha) is None):
+            continue
+        if g.get("provider") != "DraftKings" or g.get("source_type") != "rendered_browser":
+            continue
+        if not g.get("game_id") or str(g["game_id"]) != str(play.get("game_id", "")):
+            continue
+        if {_norm(g.get("away", "")), _norm(g.get("home", ""))} != {
+                _norm(play["away"]), _norm(play["home"])}:
+            continue
+        try:
+            kickoff = _utc(play["start_ts"])
+            if _utc(g["start_ts"]) != kickoff:
+                continue
+            captured = _utc(g["captured_at_utc"])
+            cutoff = _utc(g["authorized_close_cutoff_utc"])
+            if not captured <= cutoff <= kickoff:
+                continue
+            flipped = _norm(g["away"]) != _norm(play["away"])
+            m, s = play["market"], play["side"]
+            if m == "TOTAL" and g.get("total") is not None:
+                line, over, under = g["total"]
+                if abs(float(line) - float(play["line"])) > 1e-9:
+                    continue
+                mine, opp = ((over, under) if s == "OVER" else (under, over))
+            elif m == "SPREAD" and g.get("spread") is not None:
+                away_line, away_odds, home_odds = g["spread"]
+                if flipped:
+                    away_line, away_odds, home_odds = -float(away_line), home_odds, away_odds
+                my_line = float(away_line) if s == "AWAY" else -float(away_line)
+                if abs(my_line - float(play["line"])) > 1e-9:
+                    continue
+                mine, opp = ((away_odds, home_odds) if s == "AWAY"
+                             else (home_odds, away_odds))
+            elif m == "MONEYLINE" and g.get("ml") is not None:
+                away_odds, home_odds = g["ml"]
+                if flipped:
+                    away_odds, home_odds = home_odds, away_odds
+                mine, opp = ((away_odds, home_odds) if s == "AWAY"
+                             else (home_odds, away_odds))
+            else:
+                continue
+            if any(isinstance(x, bool) or not isinstance(x, (int, float))
+                   or not math.isfinite(x) or (-100 < x < 100)
+                   for x in (mine, opp)):
+                continue
+            matches.append((float(mine), float(opp)))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    # Conflicting or duplicate exact rows are ambiguous, even at same prices.
+    return matches[0] if len(matches) == 1 else None
 
-
-def grade(ledger: dict, scores: dict, closing_board: list | None = None) -> dict:
+def grade(ledger: dict, scores: dict, closing_board: list | None = None, *,
+          verified_receipt_shas: frozenset[str] | None = None) -> dict:
     for p in ledger["plays"]:
         if p["result"] is None:
             key = (str(p["game_id"]), _norm(p["away"]), _norm(p["home"]))
@@ -198,9 +243,9 @@ def grade(ledger: dict, scores: dict, closing_board: list | None = None) -> dict
                     "LOSS": -p["stake_units"], "PUSH": 0.0,
                 }[p["result"]], 4)
         if closing_board is not None and p["clv_status"] == "PENDING":
-            q = _closing_quote(p, closing_board)
+            q = _closing_quote(p, closing_board, verified_receipt_shas=verified_receipt_shas)
             if q is None:
-                p["clv_status"] = "UNAVAILABLE_LINE_MOVED_OR_MISSING"
+                p["clv_status"] = "UNAVAILABLE_UNVERIFIED_OR_MISMATCHED_CLOSE"
             else:
                 mine, opp = float(q[0]), float(q[1])
                 close_p = implied(mine) / (implied(mine) + implied(opp))
