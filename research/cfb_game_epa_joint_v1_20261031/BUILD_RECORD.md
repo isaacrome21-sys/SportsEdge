@@ -63,10 +63,15 @@ only and was **not** created.
   prod SDs 19.0/18.5). The test suite proves exact equality against
   the real evaluator's `project_season` on synthetic seasons
   (0 mismatches, 1e-12 tolerance).
-- **§2.2 market arm + close validity** — `classify_close`:
-  two-sided, pre-kickoff, captured ≤60:00 before kickoff (exactly
-  60:00 valid); the four named missing reasons `NO_CLOSE_ROW`,
-  `CLOSE_SINGLE_SIDED`, `CLOSE_NOT_PREKICKOFF`, `CLOSE_STALE`.
+- **§2.2 market arm + close validity** — `classify_close` checks,
+  in code order: no row → `NO_CLOSE_ROW`; a non-finite line raises
+  `CLOSE_RECORD_INVALID`; a missing side → `CLOSE_SINGLE_SIDED`;
+  present-but-invalid prices raise `CLOSE_PRICE_INVALID`; captured
+  at or after kickoff → `CLOSE_NOT_PREKICKOFF`; captured more than
+  60:00 before kickoff → `CLOSE_STALE` (exactly 60:00 is valid);
+  otherwise the close is VALID. The four named missing reasons are
+  `NO_CLOSE_ROW`, `CLOSE_SINGLE_SIDED`, `CLOSE_NOT_PREKICKOFF`,
+  `CLOSE_STALE`.
   Market probabilities come from `power_devig` (POWER_V1) in
   `sportsedge/devig.py` via `_devig_event_probability`, with a
   method assertion; the evaluator's ln 2 placeholder is never used
@@ -125,6 +130,8 @@ only and was **not** created.
 | `EMBARGO_HOURS` | 24 | V2 §1 (24h availability/embargo) |
 | `ADJUSTMENT_TOLERANCE` | 1e-6 | V2 §1 "iteration to a stated tolerance" — value chosen here, flagged |
 | `ADJUSTMENT_MAX_ITERATIONS` | 500 | build choice, fail-closed beyond |
+
+*Amendment (Oct 31, 2026): raised to 20000 before the freeze — see FREEZE_RECORD.md §7. The value above is the as-built history.*
 | `ADJUSTMENT_DAMPING` | 0.5 | build choice (Jacobi damping) |
 | `PRIOR_PSEUDO_GAMES` | 3.0 | build choice (prior weight in games), flagged |
 | `PRIOR_SEASON_RETENTION` | 0.65 | build choice (prior-season retention), flagged |
@@ -220,11 +227,19 @@ only and was **not** created.
     (graded count, missing share) are carried in the block either
     way. Neither outcome consumes the look.
 12. Close-classification precedence follows the CBB Amendment 2
-    machinery precedent (no-row → invalid price raises →
-    single-sided → not-pre-kickoff → stale). A present-but-invalid
+    machinery precedent, in the code's check order: no-row →
+    `NO_CLOSE_ROW`; a non-finite line raises
+    `CLOSE_RECORD_INVALID`; single-sided → `CLOSE_SINGLE_SIDED`;
+    present-but-invalid prices raise `CLOSE_PRICE_INVALID`;
+    not-pre-kickoff → `CLOSE_NOT_PREKICKOFF`; stale →
+    `CLOSE_STALE`. A present-but-invalid
     price raises `CLOSE_PRICE_INVALID` rather than taking one of
     the four missing reasons — the four reasons describe absent or
     unusable closes; an impossible price is a data defect.
+    *(Precedence wording corrected at checklist item 5 per the
+    independent review of PR #2966, note 2 — the reachable behavior
+    always matched the CBB precedent; only this listing's order
+    differed from the code's.)*
 13. `FreezeRecord` carries the prereg + implementation digests;
     the evaluator/baseline/snapshot-machinery pins of §7 are
     enumerated by the freeze act itself (checklist item 5).
