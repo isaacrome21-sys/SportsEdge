@@ -279,3 +279,63 @@ def test_missing_line_inside_quote_counts_as_missing_close(market, missing_side)
     assert r["market_numeric_requirement_met_unverified"] is False
     assert r["numeric_b_bar_met_UNVERIFIED"] is False
     assert r["admission"] == "NOT_ADMITTED"
+
+
+@pytest.mark.parametrize("market", ["MONEYLINE", "SPREAD", "TOTAL"])
+def test_four_claimed_seasons_cannot_all_use_2026_game_starts(market):
+    """Regression #2989: syntactically distinct seasons must be chronological."""
+    d = cohort(market)
+    for row in d["samples"][:196]:
+        row["game_start_utc"] = "2026-03-15T19:00:00Z"
+    with pytest.raises(
+        SBRCheckBRefusal, match="B_GAME_START_OUTSIDE_DECLARED_NBA_SEASON"
+    ):
+        run(d)
+    # Control: original four-season sample still meets numeric dry-run bars,
+    # but can never admit SBR/OddsPapi as a real source.
+    r = run(cohort(market))
+    assert r["numeric_b_bar_met_UNVERIFIED"] is True
+    assert r["admission"] == "NOT_ADMITTED"
+    assert not r["source_eligible"] and not r["play_authority"]
+
+
+@pytest.mark.parametrize("bad_start", [
+    "2022-08-31T23:59:59Z",
+    "2023-09-01T00:00:00Z",
+    "2026-03-15T19:00:00Z",
+])
+def test_nba_season_2022_23_out_of_window_refused(bad_start):
+    d = cohort()
+    d["samples"][0]["game_start_utc"] = bad_start
+    with pytest.raises(
+        SBRCheckBRefusal, match="B_GAME_START_OUTSIDE_DECLARED_NBA_SEASON"
+    ):
+        run(d)
+
+
+@pytest.mark.parametrize("valid_start", [
+    "2022-09-01T00:00:00Z",
+    "2023-08-31T23:59:59Z",
+    "2022-10-18T23:30:00-04:00",
+    "2023-06-12T23:00:00Z",
+])
+def test_nba_season_2022_23_coarse_window_boundaries(valid_start):
+    d = cohort()
+    d["samples"][0]["game_start_utc"] = valid_start
+    r = run(d)
+    assert r["numeric_b_bar_met_UNVERIFIED"] is True
+    assert r["admission"] == "NOT_ADMITTED"
+
+
+def test_2019_20_covid_extended_season_window_and_cutoff():
+    d = cohort()
+    d["samples"][0]["season"] = "2019-20"
+    d["samples"][0]["game_start_utc"] = "2020-10-11T23:00:00Z"
+    r = run(d)
+    assert r["numeric_b_bar_met_UNVERIFIED"] is True
+    assert r["admission"] == "NOT_ADMITTED"
+    d["samples"][0]["game_start_utc"] = "2020-11-01T00:00:00Z"
+    with pytest.raises(
+        SBRCheckBRefusal, match="B_GAME_START_OUTSIDE_DECLARED_NBA_SEASON"
+    ):
+        run(d)
