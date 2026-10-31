@@ -31,5 +31,13 @@ record, starts no clock, and counts no rows toward any validation.
 
 ## Grading
 
-Graded by the nightly grade run (Sat Oct 31, 2026, 23:21 CT) against the
-day's results and the lane's in-window closing captures for the same games.
+**NOT YET GRADED at the Saturday Oct 31 morning point-in-time audit.**
+The original pregame record in merge commit `2ecb6fa4b7ea55647b379d0df3d5129545421331`
+prematurely asserted a Sat Oct 31 23:21 CT nightly grade before that time
+had occurred. That assertion is not evidence of grading or closing captures;
+see integrity issue #2974. The original bytes remain available in the
+historical commit. Any later postgame grade must be separately timestamped,
+source-bound to final results and authenticated same-market closing receipts,
+and reviewed prospectively; it must not alter this pregame record or confer
+retroactive counted/CLV/verification authority. Until then: NO GRADE,
+NO AUTHENTICATED CLOSE, NO FORWARD COUNT, PAPER / 0u / NO PLAY.
