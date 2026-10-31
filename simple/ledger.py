@@ -17,10 +17,17 @@ Fail-closed checks (from ChatGPT's 2026-10-31 14:57Z review on #2447):
 - grade: --final_source is required. A close needs --close_odds AND --close_source; without them the
   close stays blank (no CLV). Only the blank grade fields of that one ungraded row are filled; the
   write is refused if any other byte of the ledger would change.
+
+Concurrency (#2987): add and grade each hold an exclusive flock on ledger.csv.lock for the whole
+read/check/write. grade also re-reads the file just before writing and refuses if it changed since its
+snapshot (catches a writer that skipped the lock), writes via temp file + fsync + os.replace, and reads
+the result back. POSIX only (fcntl).
 """
 import argparse
+import contextlib
 import csv
 import datetime as dt
+import fcntl
 import hashlib
 import io
 import math
@@ -42,11 +49,37 @@ class LedgerError(ValueError):
     pass
 
 
-def _rows():
+@contextlib.contextmanager
+def _locked():
+    """Exclusive advisory lock shared by every add/grade (blocks until free)."""
+    with open(PATH + ".lock", "a") as lf:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+
+
+def _read_text():
     if not os.path.exists(PATH):
-        return []
+        return ""
     with open(PATH, newline="") as f:
-        return list(csv.DictReader(f))
+        return f.read()
+
+
+def _rows(text=None):
+    text = _read_text() if text is None else text
+    return list(csv.DictReader(io.StringIO(text))) if text else []
+
+
+def _atomic_write(text):
+    d = os.path.dirname(os.path.abspath(PATH))
+    tmp = os.path.join(d, f".ledger.{os.getpid()}.tmp")
+    with open(tmp, "w", newline="") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, PATH)
 
 
 def _render(rows):
@@ -68,9 +101,7 @@ def _ensure_header():
     if header != COLS:
         if header != COLS[:len(header)]:
             raise LedgerError(f"unexpected ledger header {header}")
-        rows = _rows()
-        with open(PATH, "w", newline="") as f:
-            f.write(_render(rows))
+        _atomic_write(_render(_rows()))
 
 
 def check_odds(odds):
@@ -112,6 +143,11 @@ def add(a):
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     key = f"{a.agent}|{a.model}|{a.sport}|{a.market}|{a.event}|{a.side}|{a.line}"
     rid = hashlib.sha1(key.encode()).hexdigest()[:10]
+    with _locked():
+        return _add_locked(a, odds, prob, now, rid)
+
+
+def _add_locked(a, odds, prob, now, rid):
     _ensure_header()
     if any(r["id"] == rid for r in _rows()):
         print(f"skip duplicate {rid}")
@@ -124,6 +160,8 @@ def add(a):
     line = _render([row]).split("\n", 1)[1]
     with open(PATH, "a", newline="") as f:
         f.write(line)
+        f.flush()
+        os.fsync(f.fileno())
     print(f"added {rid}")
     return rid
 
@@ -140,10 +178,14 @@ def grade(a):
         raise LedgerError("a close needs --close_odds (and --close_source); leave all close fields blank otherwise")
     if a.result not in ("W", "L", "P"):
         raise LedgerError(f"result {a.result!r} not W/L/P")
+    with _locked():
+        return _grade_locked(a, final_source, close_odds, close_source)
+
+
+def _grade_locked(a, final_source, close_odds, close_source):
     _ensure_header()
-    with open(PATH, newline="") as f:
-        before = f.read()
-    rows = _rows()
+    before = _read_text()
+    rows = _rows(before)
     hits = [r for r in rows if r["id"] == a.id]
     if not hits:
         raise LedgerError(f"no such id {a.id}")
@@ -173,8 +215,12 @@ def grade(a):
     diff = [i for i, (x, y) in enumerate(zip(b_lines, a_lines)) if x != y]
     if len(b_lines) != len(a_lines) or len(diff) != 1:
         raise LedgerError("refused: grade would rewrite more than the one graded row")
-    with open(PATH, "w", newline="") as f:
-        f.write(after)
+    # compare-and-swap: refuse if the file moved since our snapshot (a writer that skipped the lock)
+    if _read_text() != before:
+        raise LedgerError("refused: ledger changed during grade; nothing written, re-run grade")
+    _atomic_write(after)
+    if _read_text() != after:
+        raise LedgerError("readback mismatch after grade write")
     print(f"graded {a.id} {a.result}")
     return a.id
 

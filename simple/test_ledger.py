@@ -97,3 +97,73 @@ def test_old_header_is_widened_without_changing_values(tmp_ledger):
     after = ledger._rows()
     assert [{k: r[k] for k in old_cols} for r in after] == before
     assert all(r["close_source"] == "" and r["final_source"] == "" for r in after)
+
+
+# ---- #2987 concurrency regressions ----
+
+def test_grade_refuses_when_file_changes_mid_grade_and_keeps_new_row(tmp_ledger, monkeypatch):
+    """ChatGPT's #2987 interleaving: B lands on disk after grade's snapshot. B must survive."""
+    rid_a = ledger.add(pick(side="A"))
+    b_line = ledger._render([dict(id="bbbbbbbbbb", agent="x", model="M", sport="NFL", market="SPREAD",
+                                  event="E", side="B", line="1", odds="-110", prob="0.5",
+                                  captured_at="2026-10-31T07:00:00-05:00", source="s")]).split("\n", 1)[1]
+    orig = ledger._render
+    fired = []
+
+    def racing_render(rows):
+        out = orig(rows)
+        if not fired:
+            fired.append(1)
+            with open(ledger.PATH, "a", newline="") as f:  # a writer that ignores the lock
+                f.write(b_line)
+        return out
+
+    monkeypatch.setattr(ledger, "_render", racing_render)
+    with pytest.raises(ledger.LedgerError, match="changed during grade"):
+        ledger.grade(gr(rid_a))
+    text = tmp_ledger.read_text()
+    assert b_line in text
+    assert {r["id"]: r["result"] for r in ledger._rows()} == {rid_a: "", "bbbbbbbbbb": ""}
+    monkeypatch.setattr(ledger, "_render", orig)
+    assert ledger.grade(gr(rid_a)) == rid_a  # clean retry succeeds
+    assert b_line in tmp_ledger.read_text()
+
+
+def test_lock_blocks_other_process(tmp_ledger):
+    import subprocess, time
+    ledger.add(pick(side="A"))
+    code = ("import sys,argparse;sys.path.insert(0,%r);import ledger;ledger.PATH=%r;"
+            "ledger.add(argparse.Namespace(agent='c',model='M',sport='NFL',market='SPREAD',event='E',side='Z',"
+            "line='1',odds=-110.0,prob=0.5,captured_at='2026-10-31T07:00:00-05:00',source='s',note=''))"
+            % (os.path.dirname(ledger.__file__), str(tmp_ledger)))
+    with ledger._locked():
+        p = subprocess.Popen([sys.executable, "-c", code])
+        time.sleep(1.0)
+        assert p.poll() is None  # waiting on the lock
+        assert len(ledger._rows()) == 1
+    assert p.wait(timeout=20) == 0
+    assert len(ledger._rows()) == 2
+
+
+def _worker(path, i):
+    import argparse as ap
+    ledger.PATH = path
+    rid = ledger.add(ap.Namespace(agent="c", model="M", sport="NFL", market="SPREAD", event=f"E{i}",
+                                  side="S", line="1", odds=-110.0, prob=0.5,
+                                  captured_at="2026-10-31T07:00:00-05:00", source="s", note=""))
+    ledger.grade(ap.Namespace(id=rid, result="W", final_source="f", close_line="", close_odds=None,
+                              close_source=""))
+
+
+def test_parallel_adds_and_grades_lose_nothing(tmp_ledger):
+    import multiprocessing as mp
+    ctx = mp.get_context("fork")
+    procs = [ctx.Process(target=_worker, args=(str(tmp_ledger), i)) for i in range(24)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(60)
+        assert p.exitcode == 0
+    rows = ledger._rows()
+    assert len(rows) == 24 and len({r["id"] for r in rows}) == 24
+    assert all(r["result"] == "W" for r in rows)
