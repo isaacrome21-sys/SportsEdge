@@ -152,21 +152,34 @@ def summarize_raw_coverage(records: dict) -> dict:
             raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_STATUS")
         if bool(pairs) != (status == "UNVERIFIED_RAW_PAIRS"):
             raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_CONFLICT")
-        if (row.get("market_admitted") is not False
+        if (row.get("source") != SOURCE
+                or row.get("source_fields") != list(PRICE_FIELDS)
+                or row.get("authenticated_draftkings") is not False
+                or row.get("market_admitted") is not False
                 or row.get("clv_authority") is not False
                 or row.get("betting_authority") is not False
                 or row.get("quote_timestamp") is not None
                 or row.get("original_response_receipt") is not None):
             raise ValueError("CFB_ML_RESEARCH_COVERAGE_UNVERIFIED_ONLY")
         status_counts[status] += 1
+        seen_providers: set[str] = set()
         for pair in pairs:
             if not isinstance(pair, dict) or not isinstance(pair.get("provider"), str):
                 raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_SCHEMA")
             provider = pair["provider"]
-            if (not provider.strip()
-                    or american_odds(pair.get("home_american")) != pair.get("home_american")
-                    or american_odds(pair.get("away_american")) != pair.get("away_american")):
+            home = pair.get("home_american")
+            away = pair.get("away_american")
+            raw_provider = pair.get("provider_raw")
+            if (not provider.strip() or provider != provider.strip()
+                    or not isinstance(raw_provider, str)
+                    or raw_provider.strip() != provider
+                    or type(home) is not int or type(away) is not int
+                    or american_odds(home) != home
+                    or american_odds(away) != away):
                 raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_INVALID")
+            if provider in seen_providers:
+                raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_DUPLICATE")
+            seen_providers.add(provider)
             providers[provider] = providers.get(provider, 0) + 1
             pair_rows += 1
     return {

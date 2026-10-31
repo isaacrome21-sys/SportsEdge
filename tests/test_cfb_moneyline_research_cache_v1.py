@@ -197,6 +197,41 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "PAIR_INVALID"):
             summarize_raw_coverage(forged)
 
+    def test_census_rejects_tampered_authority_source_provider_and_duplicate(self):
+        records = normalize_moneyline_research([game([
+            {"provider": "DraftKings", "homeMoneyline": -110,
+             "awayMoneyline": 100},
+        ])])
+        self.assertEqual(summarize_raw_coverage(records)["raw_provider_pair_rows"], 1)
+
+        for field, value in [
+            ("authenticated_draftkings", True),
+            ("source", "AUTHENTICATED_DK"),
+            ("source_fields", ["fakeMoneyline"]),
+        ]:
+            with self.subTest(field=field):
+                forged = json.loads(json.dumps(records))
+                forged["314"][field] = value
+                with self.assertRaisesRegex(ValueError, "UNVERIFIED_ONLY"):
+                    summarize_raw_coverage(forged)
+
+        for field, value in [
+            ("provider_raw", "Different Book"),
+            ("provider", " DraftKings "),
+            ("home_american", -110.0),
+            ("away_american", 100.0),
+        ]:
+            with self.subTest(field=field):
+                forged = json.loads(json.dumps(records))
+                forged["314"]["pairs"][0][field] = value
+                with self.assertRaisesRegex(ValueError, "PAIR_INVALID"):
+                    summarize_raw_coverage(forged)
+
+        forged = json.loads(json.dumps(records))
+        forged["314"]["pairs"].append(dict(forged["314"]["pairs"][0]))
+        with self.assertRaisesRegex(ValueError, "PAIR_DUPLICATE"):
+            summarize_raw_coverage(forged)
+
     def test_opt_in_cache_write_failure_is_not_reported_as_saved(self):
         raw = [game([{"provider": "DraftKings", "homeMoneyline": 110,
                      "awayMoneyline": -120}], gid=42)]
