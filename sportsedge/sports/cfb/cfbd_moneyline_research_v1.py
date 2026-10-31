@@ -129,3 +129,47 @@ def normalize_moneyline_research(games: list[dict] | None) -> dict:
             "betting_authority": False,
         }
     return out
+
+def summarize_raw_coverage(records: dict) -> dict:
+    """Count *raw unverified* provider pairs; never infer DK quote admission."""
+    if not isinstance(records, dict):
+        raise ValueError("CFB_ML_RESEARCH_COVERAGE_MAPPING_REQUIRED")
+    status_counts = {
+        "UNVERIFIED_RAW_PAIRS": 0,
+        "NO_VALID_MONEYLINE_PAIR": 0,
+        "NO_MONEYLINE_FIELDS": 0,
+        "CONFLICTING_PROVIDER_PRICE": 0,
+    }
+    providers: dict[str, int] = {}
+    pair_rows = 0
+    for gid, row in records.items():
+        if (not isinstance(row, dict) or row.get("schema") != SCHEMA
+                or row.get("game_id") != str(gid)):
+            raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_SCHEMA")
+        status = row.get("status")
+        pairs = row.get("pairs")
+        if status not in status_counts or not isinstance(pairs, list):
+            raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_STATUS")
+        if bool(pairs) != (status == "UNVERIFIED_RAW_PAIRS"):
+            raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_CONFLICT")
+        status_counts[status] += 1
+        for pair in pairs:
+            if not isinstance(pair, dict) or not isinstance(pair.get("provider"), str):
+                raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_SCHEMA")
+            provider = pair["provider"]
+            providers[provider] = providers.get(provider, 0) + 1
+            pair_rows += 1
+    return {
+        "schema": "CFB_CFBD_ML_RAW_COVERAGE_V1",
+        "status": ("EMPTY_NO_SOURCE_OBSERVATIONS" if not records
+                   else "RAW_FIELD_COVERAGE_ONLY_NOT_ADMITTED"),
+        "games_seen": len(records),
+        "games_with_raw_pairs": status_counts["UNVERIFIED_RAW_PAIRS"],
+        "raw_provider_pair_rows": pair_rows,
+        "raw_provider_counts": dict(sorted(providers.items())),
+        "games_by_status": status_counts,
+        "verified_draftkings_quote_games": 0,
+        "source_quote_timestamps_verified": 0,
+        "moneyline_market_admitted": False,
+        "actual_roi_or_clv_authority": False,
+    }
