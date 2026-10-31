@@ -29,6 +29,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from .cfbd_moneyline_research_v1 import normalize_moneyline_research
+
 ROOT = Path(__file__).resolve().parents[3]
 CACHE_ISSUE_FILE = ROOT / "config" / "cfb_history_cache_issue.json"
 MARKER = "CFBCACHE"
@@ -170,6 +172,8 @@ def _table(data, field: str) -> dict:
 
 SPECS = {
     "lines": ("/lines", lambda s: {"year": s, "seasonType": "regular"}, normalize_lines),
+    # Opt-in only: NOT included in history_names; consumes no API quota by default.
+    "ml_research": ("/lines", lambda s: {"year": s, "seasonType": "regular"}, normalize_moneyline_research),
     "talent": ("/talent", lambda s: {"year": s}, lambda d: _table(d, "talent")),
     "returning": ("/player/returning", lambda s: {"year": s}, lambda d: _table(d, "percentPPA")),
     "sp": ("/ratings/sp", lambda s: {"year": s}, lambda d: _table(d, "rating")),
