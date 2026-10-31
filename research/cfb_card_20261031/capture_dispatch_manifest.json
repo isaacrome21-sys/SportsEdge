@@ -1,0 +1,314 @@
+{
+ "run": "operative_run_20261031_cfb",
+ "dispatch": "ONE GAME PER BROWSER TASK, parallel batches",
+ "games": [
+  {
+   "dk_event_id": 34876709,
+   "game": "Arizona @ Texas Tech",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876709 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876679,
+   "game": "Boston College @ Duke",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876679 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876678,
+   "game": "Bowling Green @ Western Michigan",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876678 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876652,
+   "game": "California @ NC State",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876652 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876697,
+   "game": "Notre Dame @ Navy",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876697 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876677,
+   "game": "SMU @ Syracuse",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876677 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876675,
+   "game": "UAB @ South Florida",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876675 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876671,
+   "game": "Wisconsin @ Iowa",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876671 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876670,
+   "game": "Michigan @ Rutgers",
+   "start_ct": "2026-10-31T11:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876670 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876688,
+   "game": "Auburn @ Ole Miss",
+   "start_ct": "2026-10-31T11:45:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876688 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876650,
+   "game": "Marshall @ Old Dominion",
+   "start_ct": "2026-10-31T12:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876650 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876704,
+   "game": "Coastal Carolina @ Georgia State",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876704 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876701,
+   "game": "Kansas State @ Colorado",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876701 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876707,
+   "game": "Louisiana Tech @ South Alabama",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876707 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876660,
+   "game": "Temple @ East Carolina",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876660 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876703,
+   "game": "UConn @ Air Force",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876703 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876664,
+   "game": "Stanford @ Louisville",
+   "start_ct": "2026-10-31T14:15:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876664 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876705,
+   "game": "Arizona State @ BYU",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876705 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876666,
+   "game": "Colorado State @ Utah State",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876666 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876669,
+   "game": "FIU @ Liberty",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876669 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34226169,
+   "game": "Florida @ Georgia",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34226169 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876706,
+   "game": "Kansas @ TCU",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876706 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876693,
+   "game": "Minnesota @ Indiana",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876693 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876673,
+   "game": "Southern Miss @ ULM",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876673 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876676,
+   "game": "UTEP @ North Dakota State",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876676 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876655,
+   "game": "Utah @ Cincinnati",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876655 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876681,
+   "game": "Virginia @ Wake Forest",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876681 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876700,
+   "game": "New Mexico @ San Jose State",
+   "start_ct": "2026-10-31T15:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876700 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876696,
+   "game": "Nevada @ UCLA",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876696 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876695,
+   "game": "Purdue @ Penn State",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876695 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876698,
+   "game": "South Carolina @ Oklahoma",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876698 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876672,
+   "game": "Appalachian State @ Georgia Southern",
+   "start_ct": "2026-10-31T17:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876672 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34226170,
+   "game": "Clemson @ Florida State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34226170 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876708,
+   "game": "Oklahoma State @ Iowa State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876708 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876665,
+   "game": "Washington State @ San Diego State",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876665 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876667,
+   "game": "Georgia Tech @ Pittsburgh",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876667 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876674,
+   "game": "Miami FL @ North Carolina",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876674 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876687,
+   "game": "Mississippi State @ Texas",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876687 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34226171,
+   "game": "Ohio State @ USC",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34226171 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876702,
+   "game": "Missouri @ Arkansas",
+   "start_ct": "2026-10-31T18:45:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876702 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876649,
+   "game": "Army @ Memphis",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876649 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876680,
+   "game": "Washington @ Nebraska",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876680 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876654,
+   "game": "Texas State @ Boise State",
+   "start_ct": "2026-10-31T21:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876654 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  },
+  {
+   "dk_event_id": 34876694,
+   "game": "Oregon State @ Fresno State",
+   "start_ct": "2026-10-31T22:00:00-05:00",
+   "event_url_pattern": "https://sportsbook.draftkings.com/event/<away-slug>-%40-<home-slug>/34876694 (slug form verified from lane capture files; navigate via DK CFB league page event link if slug differs)",
+   "read_required": "Detailed rendered DK event-page read, signed out: Spread (line + both prices), Total (line + Over/Under prices), ML (both prices), DK server time; write verbatim to captures_all.json under this event id with captured_at = DK server/read time."
+  }
+ ]
+}
