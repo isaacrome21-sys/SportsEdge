@@ -53,17 +53,51 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
         self.assertEqual(result["decisions"], 2)
         self.assertEqual(result["wins"] + result["losses"], 2)
 
-    def test_paired_moneylines_require_finite_ml(self):
+    def test_paired_moneylines_require_same_named_provider_two_sides(self):
         p = {"1": {"season": 2023, "model_margin": 8, "actual_margin": 4, "home_won": True}}
         cache = {
             "lines_2023": {
-                "1": {"moneyline": -150},
-                "2": {"moneyline": None},
+                "1": {"provider": "Book A", "home_moneyline": "-150", "away_moneyline": "+135"},
+                "2": {"provider": "Book A", "home_moneyline": -110},
             }
         }
         result = paired_moneylines(p, cache)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["home_ml"], -150.0)
+        self.assertEqual(result[0]["home_ml"], -150)
+        self.assertEqual(result[0]["away_ml"], 135)
+        self.assertEqual(result[0]["provider"], "Book A")
+        self.assertIsNone(result[0]["quote_timestamp"])
+        self.assertFalse(result[0]["authenticated_draftkings"])
+
+    def test_paired_moneylines_rejects_unpaired_providerless_invalid_prices(self):
+        p = {"1": {"season": 2023, "model_margin": 8, "actual_margin": 4, "home_won": True}}
+        good = {"provider": "Book A", "home_moneyline": -130, "away_moneyline": 120}
+        bad = [
+            {"moneyline": -130},
+            {"home_moneyline": -130, "away_moneyline": 120},
+            {"provider": "Book A", "home_moneyline": -130},
+            {"provider": "Book A", "home_moneyline": -130, "away_moneyline": True},
+            {"provider": "Book A", "home_moneyline": -130.0, "away_moneyline": 120},
+            {"provider": "Book A", "home_moneyline": -130, "away_moneyline": "NaN"},
+            {"provider": "Book A", "home_moneyline": -130, "away_moneyline": "99"},
+            {"provider": "Book A", "home_moneyline": -130, "away_moneyline": "+120.0"},
+            {"providers": [
+                {"provider": "Book A", "home_moneyline": -130},
+                {"provider": "Book B", "away_moneyline": 120},
+            ]},
+        ]
+        self.assertEqual(len(paired_moneylines(p, {"lines_2023": {"1": good}})), 1)
+        for entry in bad:
+            with self.subTest(entry=entry):
+                self.assertEqual(
+                    paired_moneylines(p, {"lines_2023": {"1": entry}}), []
+                )
+
+    def test_grade_labels_flat_price_return_as_synthetic(self):
+        fit = {"intercept": 0.0, "weight": 1.0}
+        result = grade([{"model_margin": 4, "home_won": True}], fit)
+        self.assertEqual(result["synthetic_flat_minus_110_winner_return"], round(100 / 110, 5))
+        self.assertNotIn("roi_at_assumed_minus_110", result)
 
     def test_no_coverage_yields_blocked_status(self):
         # Empty paired set must not invent an edge.

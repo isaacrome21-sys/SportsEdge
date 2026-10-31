@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
+import re
 from pathlib import Path
 
 FAMILY = "PRIOR_CURRENT_BLEND"
@@ -74,43 +74,57 @@ def chronological_ml_predictions(rows):
     return out
 
 
-def paired_moneylines(preds, cache):
-    """Join model predictions to any available historical moneyline closes.
+def _american_odd(value):
+    """Strict integer American odds; reject booleans, floats and malformed text."""
+    if type(value) is int:
+        odds = value
+    elif isinstance(value, str) and re.fullmatch(r"[+-]?[0-9]+", value.strip()):
+        odds = int(value.strip())
+    else:
+        return None
+    return odds if abs(odds) >= 100 else None
 
-    The SDV / CFBD caches primarily carry spread + total. When a moneyline
-    field is present and finite it is used as a research reference only.
-    Missing or nonfinite moneyline rows are simply skipped; they never
-    become invented prices.
+
+def paired_moneylines(preds, cache):
+    """Research-only two-sided game/book candidates; never authenticated quotes.
+
+    A pair must be recorded in *one* cache row under a named provider, with
+    distinct home and away odds. Legacy scalar "moneyline" / "ml" fields,
+    one-sided values, and nested cross-book records are not admitted.
+    The archive has no independent quote timestamp, so even surviving pairs
+    cannot establish DK execution, CLV, or real moneyline ROI.
     """
     out = []
     for year in range(2016, 2026):
         archive = cache.get(f"lines_{year}") or {}
+        if not isinstance(archive, dict):
+            continue
         for gid, entry in archive.items():
             p = preds.get(str(gid))
             if p is None:
                 continue
             if p["season"] != year:
                 raise ValueError("CFB_ML_CHRONO_SEASON_ID_MISMATCH")
-            # Accept common moneyline field names if present.
-            ml = None
-            for key in ("moneyline", "ml", "home_ml", "home_moneyline"):
-                if key in entry:
-                    try:
-                        ml = float(entry[key])
-                        if math.isfinite(ml) and abs(ml) >= 100:
-                            break
-                        ml = None
-                    except (TypeError, ValueError):
-                        ml = None
-            if ml is None:
+            if not isinstance(entry, dict):
+                continue
+            provider = entry.get("provider")
+            if type(provider) is not str or not provider.strip():
+                continue
+            home = _american_odd(entry.get("home_moneyline", entry.get("home_ml")))
+            away = _american_odd(entry.get("away_moneyline", entry.get("away_ml")))
+            if home is None or away is None:
                 continue
             out.append({
                 "game_id": str(gid),
                 "season": year,
+                "provider": provider.strip(),
                 "model_margin": p["model_margin"],
                 "actual_margin": p["actual_margin"],
                 "home_won": p["home_won"],
-                "home_ml": ml,
+                "home_ml": home,
+                "away_ml": away,
+                "quote_timestamp": None,
+                "authenticated_draftkings": False,
             })
     return out
 
@@ -138,7 +152,7 @@ def grade(rows, fit, threshold=THRESHOLD):
         "pushes": pushes,
         "decisions": n,
         "win_rate": round(wins / n, 5) if n else None,
-        "roi_at_assumed_minus_110": round((wins * 100 / 110 - losses) / n, 5) if n else None,
+        "synthetic_flat_minus_110_winner_return": round((wins * 100 / 110 - losses) / n, 5) if n else None,
         "selections": direction,
     }
 
@@ -173,7 +187,7 @@ def study(paired):
     l = sum(x["losses"] for x in folds)
     n = w + l
     yr_positive = sum(
-        x["roi_at_assumed_minus_110"] is not None and x["roi_at_assumed_minus_110"] > 0
+        x["synthetic_flat_minus_110_winner_return"] is not None and x["synthetic_flat_minus_110_winner_return"] > 0
         for x in folds
     )
     roi = (w * 100 / 110 - l) / n if n else None
@@ -190,7 +204,7 @@ def study(paired):
         "schema": "CFB_CHRONO_MONEYLINE_RESIDUAL_V1",
         "status": status,
         "family": FAMILY,
-        "backtest_reference": "RECONSTRUCTED_HISTORICAL_MARKET_CLOSE_NOT_EXECUTABLE",
+        "backtest_reference": "UNAUTHENTICATED_TWO_SIDED_PRICE_CANDIDATE_ONLY",
         "selection_threshold_points": THRESHOLD,
         "assumed_american_odds": -110,
         "pooled": {
@@ -198,8 +212,8 @@ def study(paired):
             "losses": l,
             "decisions": n,
             "win_rate": round(w / n, 5) if n else None,
-            "roi_at_assumed_minus_110": round(roi, 5) if roi is not None else None,
-            "positive_roi_seasons": yr_positive,
+            "synthetic_flat_minus_110_winner_return": round(roi, 5) if roi is not None else None,
+            "positive_synthetic_return_seasons": yr_positive,
         },
         "folds": folds,
         "authority": {
@@ -208,6 +222,9 @@ def study(paired):
             "staking": False,
             "official": False,
             "forward_validated": False,
+            "dk_price_authenticated": False,
+            "quote_timestamp_verified": False,
+            "observed_price_roi": False,
             "no_backfill": True,
         },
     }
@@ -228,7 +245,7 @@ def main(argv=None):
     report["source_coverage"] = {
         "training_rows": len(rows),
         "chrono_predictions": len(predictions),
-        "paired_moneyline_games": len(paired),
+        "two_sided_unverified_price_candidates": len(paired),
         "cache_issue": 1475,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
