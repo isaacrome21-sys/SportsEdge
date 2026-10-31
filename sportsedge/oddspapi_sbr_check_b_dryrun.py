@@ -191,7 +191,13 @@ def inspect_sbr_check_b_dryrun(payload: Mapping[str, Any]) -> dict:
         sbr_price, sbr_line = _quote(raw.get("sbr_close"), market=market)
         provider_price, provider_line = _quote(
             raw.get("oddspapi_candidate"), market=market)
-        if raw.get("sbr_close") is None or raw.get("oddspapi_candidate") is None:
+        # A missing required market line is a missing close even when the
+        # caller supplies a non-null quote object. Preserve every game in
+        # the denominator and fail the numeric B bar on any missing close.
+        if (raw.get("sbr_close") is None
+                or raw.get("oddspapi_candidate") is None
+                or (market != "MONEYLINE"
+                    and (sbr_line is None or provider_line is None))):
             missing_closes += 1
         reason = None
         if not book_ok:
@@ -236,7 +242,9 @@ def inspect_sbr_check_b_dryrun(payload: Mapping[str, Any]) -> dict:
                  and len(seasons) >= MIN_SEASONS
                  and max(seasons) == cohort["season"]
                  and not absent)
-    market_rules_met = (
+    # Draft §3 also requires NO sampled game missing a closing quote.
+    # Percentage tolerances cannot waive that separate zero-missing bar.
+    market_rules_met = missing_closes == 0 and (
         (_fraction(within_10, denominator) >= ML_MIN_MATCH)
         if market == "MONEYLINE" else (
             _fraction(exact, denominator) >= LINE_MIN_EXACT
