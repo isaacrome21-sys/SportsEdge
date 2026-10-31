@@ -134,9 +134,13 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
             fetches.append((path, params, key))
             return payload
 
+        def fake_save(name, data):
+            saved.append((name, data))
+            return True
+
         rows = cache.ensure(
             ["ml_research_2024"], "fake", cache={}, budget=1,
-            fetch=fake_fetch, save=lambda name, data: saved.append((name, data)),
+            fetch=fake_fetch, save=fake_save,
             sleep=lambda _: None,
         )
         self.assertEqual(len(fetches), 1)
@@ -192,6 +196,37 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
         forged["3"]["pairs"][0]["home_american"] = float("nan")
         with self.assertRaisesRegex(ValueError, "PAIR_INVALID"):
             summarize_raw_coverage(forged)
+
+    def test_opt_in_cache_write_failure_is_not_reported_as_saved(self):
+        raw = [game([{"provider": "DraftKings", "homeMoneyline": 110,
+                     "awayMoneyline": -120}], gid=42)]
+        attempted = []
+        rows = cache.ensure(
+            ["ml_research_2024"], "fake", cache={}, budget=1,
+            fetch=lambda path, params, key: raw,
+            save=lambda name, data: attempted.append(name) and False,
+            sleep=lambda _: None,
+        )
+        self.assertEqual(attempted, ["ml_research_2024"])
+        self.assertNotIn("ml_research_2024", rows)
+
+    def test_oversized_research_comment_refuses_before_issue_write(self):
+        providers = ["DraftKings", "Bovada", "ESPN Bet", "consensus",
+                     "William Hill (New Jersey)", "numberfire", "teamrankings"]
+        raw = [
+            game([{"provider": provider, "homeMoneyline": 100 + (i * 17 + j * 11) % 400,
+                   "awayMoneyline": -100 - (i * 19 + j * 7) % 400}
+                  for j, provider in enumerate(providers)], gid=400000000 + i)
+            for i in range(1000)
+        ]
+        normalized = normalize_moneyline_research(raw)
+        payload = cache.encode_item("ml_research_2024", normalized)
+        self.assertGreater(len(payload), 60000)
+        calls = []
+        saved = cache.save_item("ml_research_2024", normalized, issue=1475,
+                                runner=lambda *args, **kwargs: calls.append(args))
+        self.assertFalse(saved)
+        self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":
