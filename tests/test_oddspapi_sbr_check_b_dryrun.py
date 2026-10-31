@@ -247,3 +247,35 @@ def test_no_input_mutation_and_deterministic_arithmetic():
     original = deepcopy(d)
     assert run(d) == run(d)
     assert d == original
+
+
+@pytest.mark.parametrize("market", ["MONEYLINE", "SPREAD", "TOTAL"])
+@pytest.mark.parametrize("missing_side", ["sbr_close", "oddspapi_candidate"])
+def test_missing_full_close_never_passes_numeric_b_even_when_rates_pass(
+        market, missing_side):
+    d = cohort(market)
+    d["samples"][0][missing_side] = None
+    r = run(d)
+    assert r["cohort_comparison_denominator"] == 200
+    assert r["missing_sbr_close_or_provider_quote"] == 1
+    assert r["row_results"][0]["status"] == "FAIL"
+    # The other 199 pairs exceed all percentage bars, but draft §3 also
+    # requires zero sampled games missing a closing quote.
+    assert r["market_numeric_requirement_met_unverified"] is False
+    assert r["numeric_b_bar_met_UNVERIFIED"] is False
+    assert r["admission"] == "NOT_ADMITTED"
+    assert r["source_eligible"] is False
+
+
+@pytest.mark.parametrize("market", ["SPREAD", "TOTAL"])
+@pytest.mark.parametrize("missing_side", ["sbr_close", "oddspapi_candidate"])
+def test_missing_line_inside_quote_counts_as_missing_close(market, missing_side):
+    d = cohort(market)
+    d["samples"][0][missing_side]["line"] = None
+    r = run(d)
+    assert r["cohort_comparison_denominator"] == 200
+    assert r["missing_sbr_close_or_provider_quote"] == 1
+    assert r["row_results"][0]["reason"] == "B_MISSING_LINE"
+    assert r["market_numeric_requirement_met_unverified"] is False
+    assert r["numeric_b_bar_met_UNVERIFIED"] is False
+    assert r["admission"] == "NOT_ADMITTED"
