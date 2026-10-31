@@ -1,20 +1,17 @@
 name: draftkings-prop-provider-probe
 
+# OWNER POLICY HOLD (2026-10-30): hidden/direct DraftKings JSON API is prohibited.
+# Keep only an inert manual entry point until a reviewed rendered-page replacement exists.
 on:
   workflow_dispatch:
-  schedule:
-    # Quote discovery only. Never Model_P. Never official.
-    - cron: "7,37 * * * *"
-  push:
-    paths:
-      - 'sportsedge/draftkings_prop_source.py'
-      - '.github/workflows/draftkings-prop-provider-probe.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   probe:
+    # This job is deliberately non-executable, including manual dispatch.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
