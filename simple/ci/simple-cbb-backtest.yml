@@ -1,15 +1,16 @@
 name: simple-cbb-backtest
 
 # STAGED COPY: move to .github/workflows/simple-cbb-backtest.yml to enable.
-# Simple line engine, CBB step (#2447 comment 6544953698). Research only: pulls historical
-# CBB lines + scores from CollegeBasketballData (<=100 calls), runs the frozen-settings
-# walk-forward test in simple/backtest_cbb.py, posts the printed result to #2447.
-# Runs only on the claude/simple-line-engine branch when the script or this file changes.
+# Simple line engine, CBB step + early-line/CLV step (#2447 comment 6544953698). Research only:
+# pulls historical CBB lines + scores from CollegeBasketballData (<=100 calls), runs the
+# frozen-settings walk-forward test in simple/backtest_cbb.py and the opener/CLV test in
+# simple/clv_cbb.py on the same file, and posts the printed results to #2447.
+# Runs only on the claude/simple-line-engine branch when a script or this file changes.
 
 on:
   push:
     branches: [claude/simple-line-engine]
-    paths: ['simple/backtest_cbb.py', '.github/workflows/simple-cbb-backtest.yml']
+    paths: ['simple/backtest_cbb.py', 'simple/clv_cbb.py', '.github/workflows/simple-cbb-backtest.yml']
 
 permissions:
   contents: read
@@ -18,7 +19,7 @@ permissions:
 jobs:
   cbb:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CBBD_API_KEY: ${{ secrets.CBBD_API_KEY || secrets.CFBD_API_KEY || secrets.SPORTSEDGE_CFBD_API_KEY }}
@@ -33,12 +34,14 @@ jobs:
           mkdir -p out
           set -o pipefail
           { python simple/backtest_cbb.py fetch out/cbb_lines.json && \
-            python simple/backtest_cbb.py test out/cbb_lines.json; } 2>&1 | tee out/summary.txt
+            python simple/backtest_cbb.py test out/cbb_lines.json && \
+            echo && echo "=== early-line / CLV (simple/clv_cbb.py) ===" && \
+            python simple/clv_cbb.py out/cbb_lines.json; } 2>&1 | tee out/summary.txt
       - name: Post result to #2447
         if: always()
         run: |
-          { echo "SIMPLE ENGINE | CBB walk-forward (automated run of simple/backtest_cbb.py @ ${GITHUB_SHA::7})"; echo; echo '```';
-            tail -n 80 out/summary.txt 2>/dev/null || echo "run failed - see log";
+          { echo "SIMPLE ENGINE | CBB walk-forward + early-line/CLV (automated run @ ${GITHUB_SHA::7})"; echo; echo '```';
+            tail -n 140 out/summary.txt 2>/dev/null || echo "run failed - see log";
             echo '```'; echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; } > out/comment.md
           gh issue comment 2447 --body-file out/comment.md
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
