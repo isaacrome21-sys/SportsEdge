@@ -12,3 +12,7 @@ Files: `odds.py` (price math), `ratings.py` (the rating solver), `backtest_nfl.p
 ## Result so far
 NFL sides, frozen test on 2020–2026: 694 bets, 51.0% ATS, −1.9% ROI. **No edge**: NFL closing lines are already sharp.
 Next: run the same engine on college basketball (CBB), where books have to price 360+ teams.
+
+## Paper-bet ledger (every model, every market, every agent)
+`simple/ledger.csv` is the one shared log. `python simple/ledger.py add ...` before the game, `grade ...` after, `summary` for ROI + CLV per model/market.
+Paper only. Never edit or delete a row; corrections are new rows. A row needs the DK price, capture time and capture source. No price, no row.
