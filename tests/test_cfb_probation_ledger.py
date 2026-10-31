@@ -175,6 +175,8 @@ class GradeTest(unittest.TestCase):
             {"game_id": "UNRELATED_GAME"},
             {"start_ts": "2026-10-11T16:00:00Z"},
             {"captured_at_utc": "2026-10-10T16:01:00Z"},
+            {"captured_at_utc": "2026-10-10T16:00:00Z",
+             "authorized_close_cutoff_utc": "2026-10-10T16:00:00Z"},
             {"captured_at_utc": "2026-10-10T13:59:00Z"},
             {"captured_at_utc": "NOT_A_TIME"},
             {"provider": "OTHER_BOOK"},
