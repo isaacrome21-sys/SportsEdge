@@ -208,7 +208,13 @@ def ensure(names, key: str, cache: dict | None = None, *, budget: int = 12, paus
             print(f"CFB_CACHE_EMPTY {name}")
             continue
         cache[name] = data
-        save(name, data)
+        durable = save(name, data)
+        if kind == "ml_research" and durable is not True:
+            # Do not expose a successful-looking in-memory research cache
+            # after the source evidence failed its GitHub issue write.
+            cache.pop(name, None)
+            print(f"CFB_ML_RESEARCH_NOT_DURABLE {name}")
+            continue
     return cache
 
 
