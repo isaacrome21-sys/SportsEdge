@@ -18,13 +18,17 @@ verified CLV, and the file carries no prices (any ROI is under a stated
 flat -110 assumption made by the evaluator, not by this collector).
 
 Exclusion rules (per game; reason recorded, never repaired or guessed):
+  E0_UNVERIFIED_ODDS_SOURCE      unknown/missing source; admit only SDV
+      core_odds_api or summary_pickcenter origins
   E1_PLACEHOLDER_DEFAULT_SOURCE  odds_source == "default" (placeholder
       2.5 / 55.5-era values; every row in 2004-2011)
   E2_NO_SPREAD_VALUE             home_team_spread is NaN (every
       summary_pickcenter row in 2012-2023 carries NaN values in this file)
   E3_NO_TOTAL_VALUE              over_under is NaN
   E4_SPREAD_FLAGGED_UNAVAILABLE  game_spread_available not explicitly true
-  E5_NOT_COMPLETED               schedule row not completed / scores missing
+  E5_NOT_COMPLETED               schedule incomplete / nonfinite final points
+  E6_INVALID_SPREAD_VALUE         close nonfinite, bool, or malformed text
+  E7_INVALID_TOTAL_VALUE          total nonfinite, bool, or malformed text
 
 Usage:
   python scripts/collect_cfb_sdv_closes.py [--seasons 2004-2026] \
@@ -37,11 +41,14 @@ import gzip
 import hashlib
 import io
 import json
+import math
+import numbers
 import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 BETTING_URL = ("https://github.com/sportsdataverse/sportsdataverse-data/"
@@ -71,6 +78,15 @@ def as_bool(series: pd.Series) -> pd.Series:
     if series.dtype == bool:
         return series
     return series.astype(str).str.lower().isin(["true", "1", "t", "yes"])
+
+
+def finite_numeric(series: pd.Series) -> pd.Series:
+    """Require real finite numeric fields; refuse booleans, text, NaN, Infinity."""
+    return series.map(lambda value: (
+        isinstance(value, (numbers.Real, np.integer, np.floating))
+        and not isinstance(value, (bool, np.bool_))
+        and math.isfinite(float(value))
+    ))
 
 
 def fetch_csv(url: str) -> tuple[pd.DataFrame, str, str]:
@@ -105,14 +121,21 @@ def apply_exclusions(merged: pd.DataFrame) -> pd.DataFrame:
     m["excl_spread"] = ""
     m["excl_total"] = ""
     default = m.odds_source == "default"
+    authentic = m.odds_source.isin(("core_odds_api", "summary_pickcenter"))
+    m.loc[~authentic & ~default, ["excl_spread", "excl_total"]] = \
+        "E0_UNVERIFIED_ODDS_SOURCE"
     m.loc[default, ["excl_spread", "excl_total"]] = "E1_PLACEHOLDER_DEFAULT_SOURCE"
     m.loc[(m.excl_spread == "") & m.home_team_spread.isna(), "excl_spread"] = "E2_NO_SPREAD_VALUE"
     m.loc[(m.excl_total == "") & m.over_under.isna(), "excl_total"] = "E3_NO_TOTAL_VALUE"
+    m.loc[(m.excl_spread == "") & ~finite_numeric(m.home_team_spread), "excl_spread"] = \
+        "E6_INVALID_SPREAD_VALUE"
+    m.loc[(m.excl_total == "") & ~finite_numeric(m.over_under), "excl_total"] = \
+        "E7_INVALID_TOTAL_VALUE"
     # CSV/object flags such as "False", "0" or NaN must not slip through
     # Python False comparison; require an explicitly affirmative source flag.
     m.loc[(m.excl_spread == "") & ~as_bool(m.game_spread_available), "excl_spread"] = \
         "E4_SPREAD_FLAGGED_UNAVAILABLE"  # noqa: E501 - reason string kept whole
-    notdone = (~m.completed) | m.home_points.isna() | m.away_points.isna()
+    notdone = (~m.completed) | ~finite_numeric(m.home_points) | ~finite_numeric(m.away_points)
     for col in ("excl_spread", "excl_total"):
         cur = m.loc[notdone, col]
         m.loc[notdone, col] = cur.where(cur != "", "E5_NOT_COMPLETED")
@@ -142,6 +165,8 @@ def build_season(betting: pd.DataFrame, schedule: pd.DataFrame) -> tuple[pd.Data
         total_scoreable=int(m.total_scoreable.sum()),
         spread_exclusions={str(k): int(v) for k, v in
                              m.loc[m.excl_spread != "", "excl_spread"].value_counts().items()},
+        total_exclusions={str(k): int(v) for k, v in
+                            m.loc[m.excl_total != "", "excl_total"].value_counts().items()},
         both_fbs_scoreable=both_fbs,
         fbs_vs_fcs_scoreable=fbs_fcs,
     )
@@ -172,7 +197,8 @@ def main(argv=None) -> int:
         frame, summary = build_season(betting, schedule)
         frames.append(frame)
         done = schedule[as_bool(schedule["completed"])
-                        & schedule.home_points.notna() & schedule.away_points.notna()]
+                        & finite_numeric(schedule.home_points)
+                        & finite_numeric(schedule.away_points)]
         # A replacement model must know the historical venue and division at
         # its prediction cutoff.  Do not silently turn unknown neutral-site
         # values into home games or admit FBS/FCS mismatches to its fit.
