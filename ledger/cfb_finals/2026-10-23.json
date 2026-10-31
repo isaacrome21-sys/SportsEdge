@@ -1,0 +1,59 @@
+{
+  "schema": "CFB_FINAL_SCORES_V1",
+  "date": "2026-10-23",
+  "source": "ESPN_SCOREBOARD",
+  "official": false,
+  "games": [
+    {
+      "game_id": "401858271",
+      "away_team": "Duke",
+      "home_team": "Virginia",
+      "away_points": 19,
+      "home_points": 16,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-23T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401858272",
+      "away_team": "NC State",
+      "home_team": "Stanford",
+      "away_points": 28,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T02:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401861965",
+      "away_team": "Massachusetts",
+      "home_team": "UConn",
+      "away_points": 16,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-23T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401862808",
+      "away_team": "Army",
+      "home_team": "Tulsa",
+      "away_points": 38,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T00:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401864525",
+      "away_team": "Air Force",
+      "home_team": "Wyoming",
+      "away_points": 14,
+      "home_points": 28,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T01:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    }
+  ],
+  "last_captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+}

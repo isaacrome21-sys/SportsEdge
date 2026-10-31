@@ -1,0 +1,495 @@
+{
+  "schema": "CFB_FINAL_SCORES_V1",
+  "games": [
+    {
+      "game_id": "401858271",
+      "away_team": "Duke",
+      "home_team": "Virginia",
+      "away_points": 19,
+      "home_points": 16,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-23T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401858272",
+      "away_team": "NC State",
+      "home_team": "Stanford",
+      "away_points": 28,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T02:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401861965",
+      "away_team": "Massachusetts",
+      "home_team": "UConn",
+      "away_points": 16,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-23T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401862808",
+      "away_team": "Army",
+      "home_team": "Tulsa",
+      "away_points": 38,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T00:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401864525",
+      "away_team": "Air Force",
+      "home_team": "Wyoming",
+      "away_points": 14,
+      "home_points": 28,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T01:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.599338+00:00"
+    },
+    {
+      "game_id": "401856727",
+      "away_team": "Texas A&M",
+      "home_team": "Alabama",
+      "away_points": 20,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856728",
+      "away_team": "LSU",
+      "home_team": "Auburn",
+      "away_points": 38,
+      "home_points": 17,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856729",
+      "away_team": "Vanderbilt",
+      "home_team": "Kentucky",
+      "away_points": 17,
+      "home_points": 34,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856730",
+      "away_team": "Oklahoma",
+      "home_team": "Mississippi State",
+      "away_points": 23,
+      "home_points": 15,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856731",
+      "away_team": "Tennessee",
+      "home_team": "South Carolina",
+      "away_points": 24,
+      "home_points": 27,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856732",
+      "away_team": "Ole Miss",
+      "home_team": "Texas",
+      "away_points": 27,
+      "home_points": 34,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856834",
+      "away_team": "Baylor",
+      "home_team": "Kansas",
+      "away_points": 24,
+      "home_points": 25,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T17:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856835",
+      "away_team": "BYU",
+      "home_team": "UCF",
+      "away_points": 31,
+      "home_points": 39,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856836",
+      "away_team": "Colorado",
+      "home_team": "Oklahoma State",
+      "away_points": 24,
+      "home_points": 57,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856837",
+      "away_team": "Houston",
+      "home_team": "Utah",
+      "away_points": 13,
+      "home_points": 21,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-25T02:15Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856838",
+      "away_team": "Iowa State",
+      "home_team": "Arizona",
+      "away_points": 3,
+      "home_points": 39,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856839",
+      "away_team": "Kansas State",
+      "home_team": "Arizona State",
+      "away_points": 17,
+      "home_points": 28,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:45Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856840",
+      "away_team": "Texas Tech",
+      "home_team": "Cincinnati",
+      "away_points": 24,
+      "home_points": 37,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401856841",
+      "away_team": "West Virginia",
+      "home_team": "TCU",
+      "away_points": 24,
+      "home_points": 20,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858270",
+      "away_team": "California",
+      "home_team": "SMU",
+      "away_points": 20,
+      "home_points": 59,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858273",
+      "away_team": "Boston College",
+      "home_team": "Georgia Tech",
+      "away_points": 49,
+      "home_points": 27,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858274",
+      "away_team": "Pittsburgh",
+      "home_team": "Miami",
+      "away_points": 23,
+      "home_points": 52,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858275",
+      "away_team": "Syracuse",
+      "home_team": "North Carolina",
+      "away_points": 31,
+      "home_points": 30,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858276",
+      "away_team": "Virginia Tech",
+      "home_team": "Clemson",
+      "away_points": 20,
+      "home_points": 16,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858495",
+      "away_team": "Oregon",
+      "home_team": "Illinois",
+      "away_points": 10,
+      "home_points": 21,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858496",
+      "away_team": "Indiana",
+      "home_team": "Michigan",
+      "away_points": 13,
+      "home_points": 6,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858497",
+      "away_team": "Iowa",
+      "home_team": "Minnesota",
+      "away_points": 10,
+      "home_points": 13,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858498",
+      "away_team": "Rutgers",
+      "home_team": "Northwestern",
+      "away_points": 14,
+      "home_points": 42,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858499",
+      "away_team": "Michigan State",
+      "home_team": "UCLA",
+      "away_points": 10,
+      "home_points": 28,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401858500",
+      "away_team": "USC",
+      "home_team": "Wisconsin",
+      "away_points": 7,
+      "home_points": 24,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401860905",
+      "away_team": "San Diego State",
+      "home_team": "Colorado State",
+      "away_points": 49,
+      "home_points": 56,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T22:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401860906",
+      "away_team": "Utah State",
+      "home_team": "Texas State",
+      "away_points": 17,
+      "home_points": 20,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401860907",
+      "away_team": "Boise State",
+      "home_team": "Washington State",
+      "away_points": 31,
+      "home_points": 10,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T22:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401862809",
+      "away_team": "Rice",
+      "home_team": "Florida Atlantic",
+      "away_points": 49,
+      "home_points": 51,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401862810",
+      "away_team": "North Texas",
+      "home_team": "Navy",
+      "away_points": 49,
+      "home_points": 39,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401862811",
+      "away_team": "UTSA",
+      "home_team": "Tulane",
+      "away_points": 42,
+      "home_points": 19,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-25T00:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401864526",
+      "away_team": "Hawai'i",
+      "home_team": "Northern Illinois",
+      "away_points": 56,
+      "home_points": 21,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401864527",
+      "away_team": "North Dakota State",
+      "home_team": "New Mexico",
+      "away_points": 16,
+      "home_points": 21,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-25T02:20Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401864528",
+      "away_team": "San Jos\u00e9 State",
+      "home_team": "Nevada",
+      "away_points": 13,
+      "home_points": 28,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T21:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866446",
+      "away_team": "Akron",
+      "home_team": "Kent State",
+      "away_points": 20,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T17:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866447",
+      "away_team": "Sacramento State",
+      "home_team": "Ball State",
+      "away_points": 17,
+      "home_points": 34,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866448",
+      "away_team": "Bowling Green",
+      "home_team": "Buffalo",
+      "away_points": 24,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T19:30Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866449",
+      "away_team": "Eastern Michigan",
+      "home_team": "Ohio",
+      "away_points": 20,
+      "home_points": 24,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T20:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866450",
+      "away_team": "Western Michigan",
+      "home_team": "Toledo",
+      "away_points": 38,
+      "home_points": 45,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T16:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401866476",
+      "away_team": "Miami (OH)",
+      "home_team": "Central Michigan",
+      "away_points": 28,
+      "home_points": 27,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T17:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401869935",
+      "away_team": "Georgia State",
+      "home_team": "Arkansas State",
+      "away_points": 32,
+      "home_points": 38,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T23:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401869967",
+      "away_team": "Louisiana",
+      "home_team": "Southern Miss",
+      "away_points": 31,
+      "home_points": 35,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T21:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401871093",
+      "away_team": "Old Dominion",
+      "home_team": "Louisiana Tech",
+      "away_points": 0,
+      "home_points": 26,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T21:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    },
+    {
+      "game_id": "401871094",
+      "away_team": "UL Monroe",
+      "home_team": "Troy",
+      "away_points": 21,
+      "home_points": 14,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-24T20:00Z",
+      "captured_at_utc": "2026-10-25T15:51:35.787963+00:00"
+    }
+  ]
+}
