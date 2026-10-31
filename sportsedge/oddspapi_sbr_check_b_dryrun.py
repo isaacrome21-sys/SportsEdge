@@ -81,6 +81,22 @@ def _season(value: Any) -> int:
     return year
 
 
+def _season_start_consistent(season: str, game_start: datetime) -> None:
+    """Coarse NBA season chronology check; NOT fixture authentication.
+
+    Season YYYY-YY covers Sep 1 YYYY through Aug 31 YYYY+1 (UTC).
+    The COVID-delayed 2019-20 NBA season ran through October 2020.
+    These broad windows deliberately avoid asserting official game dates.
+    """
+    year = _season(season)
+    lower = datetime(year, 9, 1, tzinfo=timezone.utc)
+    upper = datetime(year + 1, 9, 1, tzinfo=timezone.utc)
+    if year == 2019:
+        upper = datetime(2020, 11, 1, tzinfo=timezone.utc)
+    if not (lower <= game_start < upper):
+        raise SBRCheckBRefusal("B_GAME_START_OUTSIDE_DECLARED_NBA_SEASON")
+
+
 def _decimal(value: Any, name: str) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, (int, float, str, Decimal)):
         raise SBRCheckBRefusal(f"{name}_NON_NUMERIC")
@@ -184,6 +200,10 @@ def inspect_sbr_check_b_dryrun(payload: Mapping[str, Any]) -> dict:
                     cohort["start"] <= start <= cohort["end"]):
                 raise SBRCheckBRefusal("B_FINAL_WEEK_FIXTURE_SEASON_WINDOW_MISMATCH")
             final_week_matched.add(game)
+        # A season label alone cannot establish a four-season historical
+        # sample. Refuse impossible chronology for EVERY submitted game,
+        # not just the separately checked final-week fixture IDs.
+        _season_start_consistent(season, start)
         book_ok = (raw.get("sbr_bookmaker") == "draftkings"
                    and raw.get("oddspapi_bookmaker") == "draftkings")
         if not book_ok:
@@ -300,6 +320,7 @@ def inspect_sbr_check_b_dryrun(payload: Mapping[str, Any]) -> dict:
         "notes": [
             "Policy §3 thresholds transcribed from Rocky's issue #2447 post; original workspace draft has no repository file/hash pin.",
             "Caller-supplied final-week roster and hash strings are not a verified official schedule.",
+            "NBA season chronology is a coarse UTC Sep-Aug window (2019-20 through Oct 2020), not fixture authentication.",
             "Missing closes count in denominator; unrepresented final-week games also fail and count in denominator.",
             "SBR archive may lack timestamps and book identity; passing numeric threshold never proves CLOSE or PIT.",
             "A/C/D/E and original-source authentication must be separately demonstrated before any admission run.",
