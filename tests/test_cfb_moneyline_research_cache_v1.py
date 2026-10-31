@@ -200,15 +200,22 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
     def test_opt_in_cache_write_failure_is_not_reported_as_saved(self):
         raw = [game([{"provider": "DraftKings", "homeMoneyline": 110,
                      "awayMoneyline": -120}], gid=42)]
-        attempted = []
+        attempted, fetched = [], []
+
+        def fake_fetch(path, params, key):
+            fetched.append(params["year"])
+            return raw
+
         rows = cache.ensure(
-            ["ml_research_2024"], "fake", cache={}, budget=1,
-            fetch=lambda path, params, key: raw,
+            ["ml_research_2024", "ml_research_2025"], "fake",
+            cache={}, budget=2, fetch=fake_fetch,
             save=lambda name, data: attempted.append(name) or False,
             sleep=lambda _: None,
         )
         self.assertEqual(attempted, ["ml_research_2024"])
+        self.assertEqual(fetched, [2024])  # Stop, do not spend on 2025.
         self.assertNotIn("ml_research_2024", rows)
+        self.assertNotIn("ml_research_2025", rows)
 
     def test_oversized_research_comment_refuses_before_issue_write(self):
         providers = ["DraftKings", "Bovada", "ESPN Bet", "consensus",
