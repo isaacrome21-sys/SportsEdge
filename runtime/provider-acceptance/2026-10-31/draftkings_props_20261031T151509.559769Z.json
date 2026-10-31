@@ -1,0 +1,39 @@
+{
+  "base_url_present": true,
+  "failure_count": 2,
+  "failure_sample": [
+    {
+      "event_id": "ccab4ee9-e254-4800-069b-08df2e84886a",
+      "reason": "ValueError:invalid literal for int() with base 10: 'ccab4ee9-e254-4800-069b-08df2e84886a'"
+    },
+    {
+      "diagnostic": {
+        "league_event_count": 1,
+        "league_keys": [
+          "categories",
+          "events",
+          "leagues",
+          "markets",
+          "selections",
+          "sports",
+          "subcategories",
+          "subscriptionPartials"
+        ],
+        "v5_errors": [
+          "HTTPError:HTTP Error 403: Forbidden",
+          "HTTPError:HTTP Error 403: Forbidden"
+        ]
+      },
+      "event_id": "",
+      "reason": "DraftKingsPropSourceError:DK_NO_RECOGNIZED_PROP_QUOTES"
+    }
+  ],
+  "league_id": 84240,
+  "market_counts": {},
+  "model_p_authority": false,
+  "official_authority": false,
+  "provider": "DRAFTKINGS_WEB_RESEARCH",
+  "quotes_returned": 0,
+  "run_at_utc": "2026-10-31T15:15:09.559769+00:00",
+  "status": "BLOCKED_NO_PROP_QUOTES"
+}
