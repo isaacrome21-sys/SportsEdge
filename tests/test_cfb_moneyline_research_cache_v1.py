@@ -9,6 +9,7 @@ from sportsedge.sports.cfb.cfbd_moneyline_research_v1 import (
     SCHEMA,
     american_odds,
     normalize_moneyline_research,
+    summarize_raw_coverage,
 )
 
 
@@ -151,6 +152,38 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
         self.assertNotIn("moneyline_research", cache.normalize_lines([
             game([{"provider": "consensus", "spread": -3.5}])
         ])["314"])
+
+    def test_deterministic_raw_coverage_counts_without_admission(self):
+        records = normalize_moneyline_research([
+            game([], gid=1),
+            game([{"provider": "DraftKings", "homeMoneyline": 110}], gid=2),
+            game([{"provider": "DraftKings", "homeMoneyline": 110,
+                   "awayMoneyline": -125},
+                  {"provider": "Bovada", "homeMoneyline": 105,
+                   "awayMoneyline": -120}], gid=3),
+            game([{"provider": "DraftKings", "homeMoneyline": 110,
+                   "awayMoneyline": -125},
+                  {"provider": "DraftKings", "homeMoneyline": 120,
+                   "awayMoneyline": -135}], gid=4),
+        ])
+        summary = summarize_raw_coverage(records)
+        self.assertEqual(summary["games_seen"], 4)
+        self.assertEqual(summary["games_with_raw_pairs"], 1)
+        self.assertEqual(summary["raw_provider_pair_rows"], 2)
+        self.assertEqual(summary["raw_provider_counts"],
+                         {"Bovada": 1, "DraftKings": 1})
+        self.assertEqual(summary["games_by_status"]["NO_MONEYLINE_FIELDS"], 1)
+        self.assertEqual(summary["games_by_status"]["NO_VALID_MONEYLINE_PAIR"], 1)
+        self.assertEqual(summary["games_by_status"]["CONFLICTING_PROVIDER_PRICE"], 1)
+        self.assertEqual(summary["status"], "RAW_FIELD_COVERAGE_ONLY_NOT_ADMITTED")
+        self.assertEqual(summary["verified_draftkings_quote_games"], 0)
+        self.assertEqual(summary["source_quote_timestamps_verified"], 0)
+        self.assertFalse(summary["moneyline_market_admitted"])
+        self.assertFalse(summary["actual_roi_or_clv_authority"])
+        self.assertEqual(summarize_raw_coverage({})["status"],
+                         "EMPTY_NO_SOURCE_OBSERVATIONS")
+        with self.assertRaisesRegex(ValueError, "ROW_SCHEMA"):
+            summarize_raw_coverage({"1": {"schema": "FAKE"}})
 
 
 if __name__ == "__main__":
