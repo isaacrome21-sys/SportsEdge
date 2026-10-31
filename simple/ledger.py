@@ -19,9 +19,13 @@ Fail-closed checks (from ChatGPT's 2026-10-31 14:57Z review on #2447):
   write is refused if any other byte of the ledger would change.
 
 Concurrency (#2987): add and grade each hold an exclusive flock on ledger.csv.lock for the whole
-read/check/write. grade also re-reads the file just before writing and refuses if it changed since its
-snapshot (catches a writer that skipped the lock), writes via temp file + fsync + os.replace, and reads
-the result back. POSIX only (fcntl).
+read/check/write, writes go via temp file + fsync + os.replace, and grade reads the result back.
+POSIX only (fcntl).
+
+WRITER CONTRACT: every write to ledger.csv MUST go through this module (add/grade CLI or functions),
+which takes the lock. Writes that bypass ledger.py (hand edits, `>>`, other scripts) are NOT supported
+and can be lost: grade's final re-read narrows but does not close the window before os.replace
+(ChatGPT review 6548764884). test_ledger_contract.py pins that limit.
 """
 import argparse
 import contextlib
@@ -215,7 +219,8 @@ def _grade_locked(a, final_source, close_odds, close_source):
     diff = [i for i, (x, y) in enumerate(zip(b_lines, a_lines)) if x != y]
     if len(b_lines) != len(a_lines) or len(diff) != 1:
         raise LedgerError("refused: grade would rewrite more than the one graded row")
-    # compare-and-swap: refuse if the file moved since our snapshot (a writer that skipped the lock)
+    # best-effort re-read: refuses if the file moved since our snapshot. NOT a guarantee against
+    # writers that bypass the lock (a write between here and os.replace is lost) -- see WRITER CONTRACT.
     if _read_text() != before:
         raise LedgerError("refused: ledger changed during grade; nothing written, re-run grade")
     _atomic_write(after)
