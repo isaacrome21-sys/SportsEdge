@@ -13,11 +13,9 @@ on:
       - 'scripts/capture_nfl_dk_confirmation.py'
       - 'tests/test_capture_nfl_dk_confirmation.py'
       - 'config/workflow_cron_policy_v1.json'
-  schedule:
-    - cron: "7,22,37,52 * * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   # PR unit tests must never occupy the live capture lock while --armed waits.
@@ -27,6 +25,7 @@ concurrency:
 
 jobs:
   capture:
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 80
     env:
