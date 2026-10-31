@@ -152,11 +152,21 @@ def summarize_raw_coverage(records: dict) -> dict:
             raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_STATUS")
         if bool(pairs) != (status == "UNVERIFIED_RAW_PAIRS"):
             raise ValueError("CFB_ML_RESEARCH_COVERAGE_ROW_CONFLICT")
+        if (row.get("market_admitted") is not False
+                or row.get("clv_authority") is not False
+                or row.get("betting_authority") is not False
+                or row.get("quote_timestamp") is not None
+                or row.get("original_response_receipt") is not None):
+            raise ValueError("CFB_ML_RESEARCH_COVERAGE_UNVERIFIED_ONLY")
         status_counts[status] += 1
         for pair in pairs:
             if not isinstance(pair, dict) or not isinstance(pair.get("provider"), str):
                 raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_SCHEMA")
             provider = pair["provider"]
+            if (not provider.strip()
+                    or american_odds(pair.get("home_american")) != pair.get("home_american")
+                    or american_odds(pair.get("away_american")) != pair.get("away_american")):
+                raise ValueError("CFB_ML_RESEARCH_COVERAGE_PAIR_INVALID")
             providers[provider] = providers.get(provider, 0) + 1
             pair_rows += 1
     return {
