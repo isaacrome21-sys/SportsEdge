@@ -205,7 +205,7 @@ def _closing_quote(play: dict, closing_board: list, *,
                 continue
             captured = _utc(g["captured_at_utc"])
             cutoff = _utc(g["authorized_close_cutoff_utc"])
-            if not entry_captured < captured <= cutoff <= kickoff:
+            if not entry_captured < captured <= cutoff < kickoff:
                 continue
             flipped = _norm(g["away"]) != _norm(play["away"])
             m, s = play["market"], play["side"]
