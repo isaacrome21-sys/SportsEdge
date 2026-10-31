@@ -524,6 +524,20 @@ def _spec_hashes() -> dict:
     return want
 
 
+B8_PINNED_PLAYER_FILES = tuple(
+    name for name in B8_FROZEN_OTHER_PINS if name.endswith(".csv.gz")
+) + (B8_CORRECTED_NAME,)
+
+
+def _stage_b8_pinned_files(directory, skip=()):
+    # The hardened runtime guard admits only the exact pinned filename
+    # set (the ps_*/sp_* entries of SPEC_HASHES) before it delegates to
+    # the evaluator, so guard tests stage the whole set, not one file.
+    for name in B8_PINNED_PLAYER_FILES:
+        if name not in skip:
+            (directory / name).write_bytes(b"test-only pinned fixture")
+
+
 def test_b8_repin_spec_hashes_registry():
     want = _spec_hashes()
     # the drifted artifact's pin is REPLACED, not supplemented: a data dir
@@ -542,6 +556,7 @@ def test_b8_runtime_guard_refuses_mixed_or_missing_2025_before_evaluator(tmp_pat
 
     calls = []
     ev = types.SimpleNamespace(check_hashes=lambda path: calls.append(path) or {"pin": "ok"})
+    _stage_b8_pinned_files(tmp_path, skip={B8_CORRECTED_NAME})
     corrected = tmp_path / "sp_2025_played_v2.csv.gz"
     legacy = tmp_path / "sp_2025.csv.gz"
     with pytest.raises(SystemExit, match="B8_RUNTIME_CORRECTED_2025_FILE_SET_REQUIRED"):
@@ -574,6 +589,7 @@ def test_b8_runtime_guard_refuses_mixed_or_missing_2025_before_evaluator(tmp_pat
 def test_b8_runtime_guard_propagates_full_evaluator_hash_refusal(tmp_path):
     import types
 
+    _stage_b8_pinned_files(tmp_path, skip={B8_CORRECTED_NAME})
     (tmp_path / "sp_2025_played_v2.csv.gz").write_bytes(b"wrong hash")
 
     def refuse(_path):
