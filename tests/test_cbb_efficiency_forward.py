@@ -3,11 +3,13 @@ BUILD (sportsedge/cbb_efficiency_forward.py).
 
 The family is NOT FROZEN: these tests pin the build's contract —
 every counted entry point refuses CBB_EFFICIENCY_FORWARD_NOT_FROZEN,
-every record is NON_COUNTED with the G-1/G-2/G-3 gap stamps, the
-Illinois exclusion and identity rules refuse fail-closed, and the
-create-only writer never overwrites. Synthetic vintage under
-tmp_path; the real crosswalk and package pins are read from the
-repo (the runner verifies them at construction).
+every record is NON_COUNTED and carries its Amendment 2 section 1
+designation (gap, designated side, pick classification) under the
+adopted pick rule, the Illinois exclusion and identity rules
+refuse fail-closed, and the create-only writer never overwrites.
+Synthetic vintage under tmp_path; the real crosswalk and package
+pins are read from the repo (the runner verifies them at
+construction).
 """
 
 import csv
@@ -19,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from sportsedge import cbb_amendment2_machinery as amendment2
 from sportsedge import cbb_torvik_efficiency_v1 as core
 from sportsedge.cbb_efficiency_forward import (
     CbbEfficiencyForwardRunner,
@@ -86,7 +89,7 @@ def vintage(tmp_path):
     return load_vintage(SLATE, _store(tmp_path))
 
 
-def test_happy_path_records_are_non_counted_and_gap_stamped(
+def test_happy_path_records_are_non_counted_and_designated(
         runner, vintage):
     out = runner.price_slate(SLATE, [_game()], vintage=vintage, now=NOW)
     assert out["counted"] is False and out["refusals"] == []
@@ -96,13 +99,32 @@ def test_happy_path_records_are_non_counted_and_gap_stamped(
     assert spread["counted"] is False
     assert spread["freeze_state"] == "DRAFT_NOT_IN_FORCE"
     assert spread["verified_play"] is False
-    # G-1: no pick is designated, ever, in this build.
-    assert spread["classification"] == "PICK_RULE_UNDEFINED"
-    assert spread["pick"] is None and spread["pick_rule"] == \
-        "PICK_RULE_UNDEFINED"
+    # Amendment 2 section 1: every record carries its gap,
+    # designated side, and classification under the adopted rule
+    # ids; the adopted amendment text is pinned on the record.
+    assert spread["pick_rule"] == "AMENDMENT_2_S1_PICK_RULE"
     assert spread["interval_construction"] == \
-        "INTERVAL_CONSTRUCTION_UNDEFINED_GAP_G2"
-    assert spread["close_rule"] == "CLOSE_RULE_UNDEFINED_GAP_G3"
+        "AMENDMENT_2_S2_GAME_CLUSTER_BOOTSTRAP_10000_SEED_20261028"
+    assert spread["close_rule"] == "AMENDMENT_2_S3_CLOSE_VALIDITY"
+    assert spread["amendment_2_sha256"] == \
+        "25be46029ca1933e1a2eb7d7aa6a858928f3879a254285e90a0b9bf1270d926a"
+    for rec, threshold in ((spread, 2.2), (by_market["TOTAL"], 3.5)):
+        model_value = (rec["model_margin_home_candidate"]
+                       if rec["market"] == "SPREAD"
+                       else rec["model_total_candidate"])
+        expected = amendment2.designate_pick(
+            rec["market"], model_value, rec["line"])
+        assert rec["gap"] == expected["gap"]
+        assert rec["designated_side"] == expected["designated_side"]
+        assert rec["classification"] == expected["classification"]
+        assert rec["pick_threshold"] == threshold
+        assert rec["pick"] == (
+            expected["designated_side"]
+            if expected["classification"] == "PICKED" else None)
+    # On this fixture the model margin (~+0.6) against the -4.5
+    # away line is a PICKED HOME row.
+    assert spread["classification"] == "PICKED"
+    assert spread["pick"] == "HOME"
     # Identity resolved through the crosswalk, not display names.
     assert spread["away_team"] == "duke"
     assert spread["home_team"] == "kansas"
@@ -189,7 +211,8 @@ def test_post_tip_capture_and_duplicate_game_refuse(runner, vintage):
     assert any(r["reason"] == "DUPLICATE_GAME" for r in out2["refusals"])
 
 
-def test_settlement_grades_accuracy_and_stamps_g3(runner, vintage):
+def test_settlement_grades_accuracy_and_stamps_close_rule(
+        runner, vintage):
     out = runner.price_slate(SLATE, [_game()], vintage=vintage, now=NOW)
     finals = {"401900001": {"home_points": 80, "away_points": 70}}
     closes = {r["row_id"]: {"line": 146.5, "note": "as captured"}
@@ -202,10 +225,11 @@ def test_settlement_grades_accuracy_and_stamps_g3(runner, vintage):
     rec_total = [r for r in out["records"] if r["market"] == "TOTAL"][0]
     assert total["abs_error_candidate"] == abs(
         rec_total["model_total_candidate"] - 150)
-    # G-3: the close is recorded as reported; nothing is excluded.
+    # The close is recorded as reported on the settlement path;
+    # validity is judged only in the verdict machinery.
     assert total["close_supplied"] is True
     assert total["close"]["line"] == 146.5
-    assert total["close_rule"] == "CLOSE_RULE_UNDEFINED_GAP_G3"
+    assert total["close_rule"] == "AMENDMENT_2_S3_CLOSE_VALIDITY"
     missing = runner.settle_records(out["records"], {})
     assert all(s["settlement"] == "RESULT_UNAVAILABLE" for s in missing)
 

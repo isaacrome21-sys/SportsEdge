@@ -59,8 +59,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
 
+from sportsedge import cbb_amendment2_machinery as amendment2  # noqa: E402
 from sportsedge import cbb_torvik_efficiency_v1 as core  # noqa: E402
 from sportsedge.cbb_efficiency_forward import (  # noqa: E402
+    FAMILY_ID as EFFICIENCY_FAMILY_ID,
     CbbEfficiencyForwardRunner,
 )
 from sportsedge.cbb_torvik_efficiency_v1 import (  # noqa: E402
@@ -291,8 +293,28 @@ def main():
               len(out["records"]) == 2 * len(games))
         check(f"every record NON_COUNTED ({slate_date})",
               all(r["counted"] is False and r["label"] == "NON_COUNTED"
-                  and r["classification"] == "PICK_RULE_UNDEFINED"
-                  and r["pick"] is None for r in out["records"]))
+                  for r in out["records"]))
+        # Amendment 2 section 1: designations are carried on the
+        # records, consistent with the adopted thresholds, and the
+        # pick is set exactly on PICKED rows.
+        check(f"every record Amendment-2 designated ({slate_date})",
+              all(r["classification"] in
+                  ("PICKED", "PASSED", "GAP_ZERO")
+                  and (r["pick"] is not None) ==
+                  (r["classification"] == "PICKED")
+                  and (r["pick"] is None or
+                       r["pick"] == r["designated_side"])
+                  and (r["designated_side"] is None) ==
+                  (r["classification"] == "GAP_ZERO")
+                  and r["pick_rule"] ==
+                  amendment2.PICK_RULE_ID
+                  and r["interval_construction"] ==
+                  amendment2.INTERVAL_CONSTRUCTION_ID
+                  and r["close_rule"] ==
+                  amendment2.CLOSE_RULE_ID
+                  and r["pick_threshold"] ==
+                  amendment2.PICK_THRESHOLDS[r["market"]]
+                  for r in out["records"]))
         all_records.extend(out["records"])
 
         # Illinois exclusion demo on the same vintage.
@@ -386,6 +408,59 @@ def main():
     except CbbForwardError as exc:
         check("R-1 late-pull vintage refuses",
               exc.reason == "TORVIK_VINTAGE_LATE_PULL", exc.reason)
+
+    # -- Amendment 2 verdict machinery, exercised on the priced
+    # historical rows with the fixtures' known finals and
+    # SYNTHETIC same-line closes (a computability exercise, never
+    # evidence about the family): the review gate stays shut well
+    # below 40 graded games and the leg quantities compute
+    # deterministically at the pinned seed.
+    finals_map, synthetic_closes = {}, {}
+    for slate_date, fixtures in fixtures_by_date.items():
+        for fx in fixtures:
+            finals_map[fx["espn_game_id"]] = {
+                "home_points": fx["home_score"],
+                "away_points": fx["away_score"]}
+    for r in all_records:
+        tip = datetime.strptime(r["tip_utc"], "%Y-%m-%dT%H:%M:%SZ")
+        synthetic_closes[r["row_id"]] = {
+            "line": r["line"], "side_a_price": r["side_a_price"],
+            "side_b_price": r["side_b_price"],
+            "captured_at": (tip - timedelta(minutes=30)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")}
+    gated = amendment2.evaluate_forward_test(
+        all_records, finals_map, synthetic_closes,
+        family_id=EFFICIENCY_FAMILY_ID, k_at_verdict=12)
+    quantities_a = amendment2.compute_review_quantities(
+        all_records, finals_map, synthetic_closes, k=12)
+    quantities_b = amendment2.compute_review_quantities(
+        all_records, finals_map, synthetic_closes, k=12)
+    check("amendment 2 gate shut below 40 graded games",
+          gated["review_status"] == "REVIEW_NOT_DUE"
+          and gated["verdict"] is None
+          and "accuracy" not in gated and "market_leg" not in gated)
+    check("amendment 2 quantities deterministic (pinned seed)",
+          quantities_a == quantities_b)
+    check("amendment 2 quantities cover every priced row",
+          sum(quantities_a["dispositions"].values())
+          == len(all_records)
+          and quantities_a["market_leg"]["picked_rows"]
+          + quantities_a["passed_rows"]
+          + quantities_a["gap_zero_rows"] == len(all_records))
+    results["amendment2_machinery_exercise"] = {
+        "closes": "SYNTHETIC_SAME_LINE_FIXTURE_EXERCISE",
+        "review_status": gated["review_status"],
+        "graded_games": gated["graded_games"],
+        "dispositions": quantities_a["dispositions"],
+        "picked_rows": quantities_a["market_leg"]["picked_rows"],
+        "roi_on_picked": quantities_a["market_leg"][
+            "roi_on_picked"],
+        "mean_clv_picked_same_line": quantities_a["market_leg"][
+            "mean_clv_picked_same_line"],
+        "accuracy_point_estimates": {
+            market: block["mean_paired_difference"]
+            for market, block in quantities_a["accuracy"].items()},
+    }
 
     sample_path = OUT_DIR / "entry_records_sample.jsonl"
     try:
