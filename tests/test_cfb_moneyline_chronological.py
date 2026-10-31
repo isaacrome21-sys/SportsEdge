@@ -108,10 +108,26 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
 
     def test_small_test_set_never_passes_screen(self):
         report = study(rows(2025, 10))
-        self.assertIn(
-            report["status"],
-            ("NO_HISTORICALLY_VERIFIED_EDGE", "BLOCKED_NO_MONEYLINE_COVERAGE"),
-        )
+        self.assertEqual(report["status"], "BLOCKED_INSUFFICIENT_CHRONO_TRAINING")
+        self.assertEqual(report["pooled"]["decisions"], 0)
+        self.assertFalse(report["authority"]["forward_validated"])
+
+    def test_trainable_folds_without_selections_are_not_missing_price_coverage(self):
+        from unittest.mock import patch
+
+        data = [x for year in range(2017, 2026) for x in rows(year)]
+        empty_grade = {
+            "wins": 0,
+            "losses": 0,
+            "decisions": 0,
+            "synthetic_flat_minus_110_winner_return": None,
+        }
+        with patch("scripts.research_cfb_moneyline_chronological.grade", return_value=empty_grade):
+            report = study(data)
+        self.assertGreater(len(report["folds"]), 0)
+        self.assertEqual(report["status"], "BLOCKED_NO_ELIGIBLE_DECISIONS")
+        self.assertEqual(report["pooled"]["decisions"], 0)
+        self.assertFalse(report["authority"]["bets"])
 
 
 if __name__ == "__main__":

@@ -2,26 +2,6 @@ name: sportsedge-auto-dk-four-sports
 
 # Owner receives automatic sportsbook intake and cards without pasted lines.
 on:
-  schedule:
-    - cron: '17 10 * * *'
-    # Sunday 10:17 AM CT during DST (9:17 AM CT in standard time).
-    # Reserve-aware NFL-only quote refresh before the main afternoon slate.
-    - cron: '17 15 * * 0'
-  # Immediately run one guarded live capture when this workflow merges to main;
-  # avoid repeated paid API calls from unrelated repository commits.
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/collect_auto_dk_four_sports.py'
-      - 'scripts/run_auto_dk_cards.py'
-      - 'scripts/render_auto_dk_phone_summary.py'
-      - 'scripts/render_sportsedge_png.py'
-      - 'scripts/collect_nfl_auto_props.py'
-      - 'scripts/run_auto_dk_live_value_card.py'
-      - 'sportsedge/auto_dk_canonical_intake.py'
-      - 'scripts/fallback_nfl_direct_dk.py'
-      - 'sportsedge/sports/nfl/auto_slate.py'
-      - '.github/workflows/sportsedge-auto-dk-four-sports.yml'
   pull_request:
     paths:
       - 'scripts/render_auto_dk_phone_summary.py'
@@ -51,7 +31,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
+  issues: read
 
 concurrency:
   group: sportsedge-paid-odds-api
@@ -72,7 +52,7 @@ jobs:
           python -m pip install --disable-pip-version-check pytest==9.1.1 Pillow==12.3.0
           python -m pytest -q tests/test_auto_dk_phone_summary.py tests/test_sportsedge_png.py tests/test_nfl_auto_props.py tests/test_nfl_direct_fallback.py tests/test_nfl_auto_slate.py tests/test_auto_dk_canonical_intake.py tests/test_bet_issue_crosscheck.py
   auto:
-    if: github.repository_owner == 'isaacrome21-sys' && github.event_name != 'pull_request'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

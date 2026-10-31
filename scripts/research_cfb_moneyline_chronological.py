@@ -198,8 +198,12 @@ def study(paired):
         and roi is not None and roi >= 0.02
         else "NO_HISTORICALLY_VERIFIED_EDGE"
     )
-    if n == 0:
+    if not paired:
         status = "BLOCKED_NO_MONEYLINE_COVERAGE"
+    elif not folds:
+        status = "BLOCKED_INSUFFICIENT_CHRONO_TRAINING"
+    elif n == 0:
+        status = "BLOCKED_NO_ELIGIBLE_DECISIONS"
     return {
         "schema": "CFB_CHRONO_MONEYLINE_RESIDUAL_V1",
         "status": status,
