@@ -1,0 +1,1019 @@
+{
+ "captured_at_note": "Skeleton written Fri 2026-10-30 ~21:50 CT. NO captures yet: DK event pages are login-walled to the text-fetch crawler (verified on a verbatim lane event URL - page returns \"You must be logged in to view this content\"). Prices may ONLY come from detailed rendered DK event-page reads via live-browser single-game tasks, which the parent must dispatch; each returned read is to be written verbatim into \"captures\" keyed by dk_event_id (schema per operative_run_20261030_runit: dk_event_id, sport, away, home, start_ct, captured_at, source, main_lines_text or verbatim_body), then build_card.py prices and gates them.",
+ "captures": {
+  "34226169": {
+   "away": "Florida",
+   "captured_at": "2026-10-30T21:51:26-05:00",
+   "dk_event_id": "34226169",
+   "home": "Georgia",
+   "main_lines_text": "Spread +12.5 -112 -108\nTotal 56.5 -108 -112\nML +340 -440",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:51 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Florida": {
+     "line": 21.5,
+     "over": -105,
+     "under": -125
+    },
+    "Georgia": {
+     "line": 34.5,
+     "over": -110,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Florida +12.5 at -112; Georgia -12.5 at -108. Total: Over 56.5 at -108; Under 56.5 at -112. Moneyline: Florida +340; Georgia -440. Team totals: Florida O/U 21.5 (-105/-125); Georgia O/U 34.5 (-110/-115). No main market missing or suspended. DK server time at read: 10/30/2026 9:51:26 PM."
+  },
+  "34226170": {
+   "away": "Clemson",
+   "captured_at": "2026-10-30T21:54:18-05:00",
+   "dk_event_id": "34226170",
+   "home": "Florida State",
+   "main_lines_text": "Spread +6 -112 -108\nTotal 49.5 -112 -108\nML +180 -218",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:52-21:54 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "team_totals": {
+    "Clemson": {
+     "line": 20.5,
+     "over": -130,
+     "under": 100
+    },
+    "Florida State": {
+     "line": 27.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Clemson +6 at -112; Florida State -6 at -108. Total: Over 49.5 at -112; Under 49.5 at -108. Moneyline: Clemson +180; Florida State -218. Team totals: Clemson O/U 20.5 (-130/+100); Florida State O/U 27.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:54:18 PM."
+  },
+  "34226171": {
+   "away": "Ohio State",
+   "captured_at": "2026-10-30T21:54:13-05:00",
+   "dk_event_id": "34226171",
+   "home": "USC",
+   "main_lines_text": "Spread -6.5 -112 -108\nTotal 50.5 -120 +100\nML -245 +200",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:53-21:54 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "team_totals": {
+    "Ohio State": {
+     "line": 28.5,
+     "over": -115,
+     "under": -115
+    },
+    "USC": {
+     "line": 21.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Ohio State -6.5 at -112; USC +6.5 at -108. Total: Over 50.5 at -120; Under 50.5 at +100. Moneyline: Ohio State -245; USC +200. Team totals: Ohio State O/U 28.5 (-115/-115); USC O/U 21.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:54:13 PM."
+  },
+  "34876649": {
+   "away": "Army",
+   "captured_at": "2026-10-30T21:56:12-05:00",
+   "dk_event_id": "34876649",
+   "home": "Memphis",
+   "main_lines_text": "Spread +6 -110 -110\nTotal 59.5 -112 -108\nML +180 -218",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:54-21:56 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "team_totals": {
+    "Army": {
+     "line": 27.5,
+     "over": -110,
+     "under": -115
+    },
+    "Memphis": {
+     "line": 33.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Army +6 at -110; Memphis -6 at -110. Total: Over 59.5 at -112; Under 59.5 at -108. Moneyline: Army +180; Memphis -218. Team totals: Army O/U 27.5 (-110/-115); Memphis O/U 33.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:56:12 PM."
+  },
+  "34876650": {
+   "away": "Marshall",
+   "captured_at": "2026-10-30T21:48:06-05:00",
+   "dk_event_id": "34876650",
+   "home": "Old Dominion",
+   "main_lines_text": "Spread -3 -108 -112\nTotal 46.5 -110 -110\nML -142 +120",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T12:00:00-05:00",
+   "team_totals": {
+    "Marshall": {
+     "line": 25.5,
+     "over": 105,
+     "under": -140
+    },
+    "Old Dominion": {
+     "line": 21.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: Marshall -3 at -108; Old Dominion +3 at -112. Total: Over 46.5 at -110; Under 46.5 at -110. Moneyline: Marshall -142; Old Dominion +120. Team totals: Marshall O/U 25.5 (+105/-140); Old Dominion O/U 21.5 (-110/-120). No market missing or suspended. DK server time at read: 10/30/2026 9:48:06 PM."
+  },
+  "34876652": {
+   "away": "California",
+   "captured_at": "2026-10-30T21:45:39-05:00",
+   "dk_event_id": "34876652",
+   "home": "NC State",
+   "main_lines_text": "Spread +9.5 -108 -112\nTotal 56.5 -112 -108\nML +250 -310",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:45 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "California": {
+     "line": 22.5,
+     "over": -120,
+     "under": -110
+    },
+    "NC State": {
+     "line": 32.5,
+     "over": -130,
+     "under": 100
+    }
+   },
+   "verbatim_detail": "Spread: California +9.5 at -108; NC State -9.5 at -112. Total: Over 56.5 at -112; Under 56.5 at -108. Moneyline: California +250; NC State -310. Team totals: California O/U 22.5 (-120/-110); NC State O/U 32.5 (-130/+100). No main market missing or suspended. DK server time at read: 10/30/2026 9:45:39 PM."
+  },
+  "34876654": {
+   "away": "Texas State",
+   "captured_at": "2026-10-30T21:56:19-05:00",
+   "dk_event_id": "34876654",
+   "home": "Boise State",
+   "main_lines_text": "Spread +10.5 -110 -110\nTotal 63.5 -115 -105\nML +340 -440",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:54-21:56 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T21:00:00-05:00",
+   "team_totals": {
+    "Boise State": {
+     "line": 37.5,
+     "over": -120,
+     "under": -110
+    },
+    "Texas State": {
+     "line": 25.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Texas State +10.5 at -110; Boise State -10.5 at -110. Total: Over 63.5 at -115; Under 63.5 at -105. Moneyline: Texas State +340; Boise State -440. Team totals: Boise State O/U 37.5 (-120/-110); Texas State O/U 25.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:56:19 PM."
+  },
+  "34876655": {
+   "away": "Utah",
+   "captured_at": "2026-10-30T21:52:30-05:00",
+   "dk_event_id": "34876655",
+   "home": "Cincinnati",
+   "main_lines_text": "Spread -7 -112 -108\nTotal 56.5 -110 -110\nML -270 +220",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "team_totals": {
+    "Cincinnati": {
+     "line": 23.5,
+     "over": -130,
+     "under": 100
+    },
+    "Utah": {
+     "line": 33.5,
+     "over": 100,
+     "under": -135
+    }
+   },
+   "verbatim_detail": "Spread: Utah -7 at -112; Cincinnati +7 at -108. Total: Over 56.5 at -110; Under 56.5 at -110. Moneyline: Utah -270; Cincinnati +220. Team totals: Utah O/U 33.5 (+100/-135); Cincinnati O/U 23.5 (-130/+100). No market missing or suspended. DK server time at read: 10/30/2026 9:52 PM (minute precision as reported)."
+  },
+  "34876660": {
+   "away": "Temple",
+   "captured_at": "2026-10-30T21:47:56-05:00",
+   "dk_event_id": "34876660",
+   "home": "East Carolina",
+   "main_lines_text": "Spread +4.5 -110 -110\nTotal 50.5 -108 -112\nML +164 -198",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "team_totals": {
+    "East Carolina": {
+     "line": 27.5,
+     "over": -105,
+     "under": -120
+    },
+    "Temple": {
+     "line": 22.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Temple +4.5 at -110; East Carolina -4.5 at -110. Total: Over 50.5 at -108; Under 50.5 at -112. Moneyline: Temple +164; East Carolina -198. Team totals: East Carolina O/U 27.5 (-105/-120); Temple O/U 22.5 (-115/-115). No main market missing or suspended. DK server time at read: 10/30/2026 9:47:56 PM."
+  },
+  "34876664": {
+   "away": "Stanford",
+   "captured_at": "2026-10-30T21:50:26-05:00",
+   "dk_event_id": "34876664",
+   "home": "Louisville",
+   "main_lines_text": "Spread +22.5 -110 -110\nTotal 60.5 -110 -110\nML +1100 -2100",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:15:00-05:00",
+   "team_totals": {
+    "Louisville": {
+     "line": 41.5,
+     "over": -105,
+     "under": -125
+    },
+    "Stanford": {
+     "line": 17.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Stanford +22.5 at -110; Louisville -22.5 at -110. Total: Over 60.5 at -110; Under 60.5 at -110. Moneyline: Stanford +1100; Louisville -2100. Team totals: Louisville O/U 41.5 (-105/-125); Stanford O/U 17.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:50:26 PM."
+  },
+  "34876665": {
+   "away": "Washington State",
+   "captured_at": "2026-10-30T21:53:15-05:00",
+   "dk_event_id": "34876665",
+   "home": "San Diego State",
+   "main_lines_text": "Spread +2.5 -105 -115\nTotal 47.5 -115 -105\nML +120 -142",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:52-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "team_totals": {
+    "San Diego State": {
+     "line": 24.5,
+     "over": -115,
+     "under": -115
+    },
+    "Washington State": {
+     "line": 22.5,
+     "over": -125,
+     "under": -105
+    }
+   },
+   "verbatim_detail": "Spread: Washington State +2.5 at -105; San Diego State -2.5 at -115. Total: Over 47.5 at -115; Under 47.5 at -105. Moneyline: Washington State +120; San Diego State -142. Team totals: San Diego State O/U 24.5 (-115/-115); Washington State O/U 22.5 (-125/-105). No market missing or suspended. DK server time at read: 10/30/2026 9:53:15 PM."
+  },
+  "34876666": {
+   "away": "Colorado State",
+   "captured_at": "2026-10-30T21:50:27-05:00",
+   "dk_event_id": "34876666",
+   "home": "Utah State",
+   "main_lines_text": "Spread +7.5 -115 -105\nTotal 61.5 -115 -105\nML +225 -278",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Colorado State": {
+     "line": 26.5,
+     "over": -125,
+     "under": -105
+    },
+    "Utah State": {
+     "line": 34.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Colorado State +7.5 at -115; Utah State -7.5 at -105. Total: Over 61.5 at -115; Under 61.5 at -105. Moneyline: Colorado State +225; Utah State -278. Team totals: Colorado State O/U 26.5 (-125/-105); Utah State O/U 34.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:50:27 PM."
+  },
+  "34876667": {
+   "away": "Georgia Tech",
+   "captured_at": "2026-10-30T21:56:25-05:00",
+   "dk_event_id": "34876667",
+   "home": "Pittsburgh",
+   "main_lines_text": "Spread +8.5 -112 -108\nTotal 54.5 -115 -105\nML +245 -305",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:53-21:56 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "team_totals": {
+    "Georgia Tech": {
+     "line": 22.5,
+     "over": -115,
+     "under": -115
+    },
+    "Pittsburgh": {
+     "line": 32.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: Georgia Tech +8.5 at -112; Pittsburgh -8.5 at -108. Total: Over 54.5 at -115; Under 54.5 at -105. Moneyline: Georgia Tech +245; Pittsburgh -305. Team totals: Georgia Tech O/U 22.5 (-115/-115); Pittsburgh O/U 32.5 (-110/-120). No market missing or suspended. DK server time at read: 10/30/2026 9:56:25 PM."
+  },
+  "34876669": {
+   "away": "FIU",
+   "captured_at": "2026-10-30T21:50:50-05:00",
+   "dk_event_id": "34876669",
+   "home": "Liberty",
+   "main_lines_text": "Spread +14 -112 -108\nTotal 45.5 -102 -118\nML +425 -575",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:51 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "FIU": {
+     "line": 14.5,
+     "over": -110,
+     "under": -120
+    },
+    "Liberty": {
+     "line": 29.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: FIU +14 at -112; Liberty -14 at -108. Total: Over 45.5 at -102; Under 45.5 at -118. Moneyline: FIU +425; Liberty -575. Team totals: FIU O/U 14.5 (-110/-120); Liberty O/U 29.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:50:50 PM."
+  },
+  "34876670": {
+   "away": "Michigan",
+   "captured_at": "2026-10-30T21:47:51-05:00",
+   "dk_event_id": "34876670",
+   "home": "Rutgers",
+   "main_lines_text": "Spread -16.5 -105 -115\nTotal 46.5 -108 -112\nML -700 +500",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:30:00-05:00",
+   "team_totals": {
+    "Michigan": {
+     "line": 29.5,
+     "over": -140,
+     "under": 105
+    },
+    "Rutgers": {
+     "line": 14.5,
+     "over": 100,
+     "under": -130
+    }
+   },
+   "verbatim_detail": "Spread: Michigan -16.5 at -105; Rutgers +16.5 at -115. Total: Over 46.5 at -108; Under 46.5 at -112. Moneyline: Michigan -700; Rutgers +500. Team totals: Michigan O/U 29.5 (-140/+105); Rutgers O/U 14.5 (+100/-130). No market missing or suspended. DK server time at read: 10/30/2026 9:47:51 PM."
+  },
+  "34876671": {
+   "away": "Wisconsin",
+   "captured_at": "2026-10-30T21:45:56-05:00",
+   "dk_event_id": "34876671",
+   "home": "Iowa",
+   "main_lines_text": "Spread +2.5 -105 -115\nTotal 36.5 -108 -112\nML +114 -135",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:46 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "Iowa": {
+     "line": 19.5,
+     "over": -110,
+     "under": -120
+    },
+    "Wisconsin": {
+     "line": 16.5,
+     "over": -130,
+     "under": 100
+    }
+   },
+   "verbatim_detail": "Spread: Wisconsin +2.5 at -105; Iowa -2.5 at -115. Total: Over 36.5 at -108; Under 36.5 at -112. Moneyline: Wisconsin +114; Iowa -135. Team totals: Iowa O/U 19.5 (-110/-120); Wisconsin O/U 16.5 (-130/+100). No market missing or suspended. DK server time at read: 10/30/2026 9:45:56 PM."
+  },
+  "34876672": {
+   "away": "Appalachian State",
+   "captured_at": "2026-10-30T21:52:40-05:00",
+   "dk_event_id": "34876672",
+   "home": "Georgia Southern",
+   "main_lines_text": "Spread +5.5 -108 -112\nTotal 57.5 -105 -115\nML +180 -218",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:52 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T17:30:00-05:00",
+   "team_totals": {
+    "Appalachian State": {
+     "line": 26.5,
+     "over": -105,
+     "under": -125
+    },
+    "Georgia Southern": {
+     "line": 31.5,
+     "over": -105,
+     "under": -125
+    }
+   },
+   "verbatim_detail": "Spread: Appalachian State +5.5 at -108; Georgia Southern -5.5 at -112. Total: Over 57.5 at -105; Under 57.5 at -115. Moneyline: Appalachian State +180; Georgia Southern -218. Team totals: Appalachian State O/U 26.5 (-105/-125); Georgia Southern O/U 31.5 (-105/-125). No market missing or suspended. DK server time at read: 10/30/2026 9:52:40 PM."
+  },
+  "34876673": {
+   "away": "Southern Miss",
+   "captured_at": "2026-10-30T21:50:21-05:00",
+   "dk_event_id": "34876673",
+   "home": "UL Monroe",
+   "main_lines_text": "Spread -3.5 -102 -118\nTotal 55.5 -110 -110\nML -166 +140",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Southern Miss": {
+     "line": 29.5,
+     "over": -120,
+     "under": -110
+    },
+    "UL Monroe": {
+     "line": 26.5,
+     "over": -115,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Southern Miss -3.5 at -102; ULM +3.5 at -118. Total: Over 55.5 at -110; Under 55.5 at -110. Moneyline: Southern Miss -166; ULM +140. Team totals: Southern Miss O/U 29.5 (-120/-110); ULM O/U 26.5 (-115/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:50:21 PM."
+  },
+  "34876674": {
+   "away": "Miami FL",
+   "captured_at": "2026-10-30T21:55:54-05:00",
+   "dk_event_id": "34876674",
+   "home": "North Carolina",
+   "main_lines_text": "Spread -14 -112 -108\nTotal 53.5 -108 -112\nML -625 +455",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:53-21:56 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "team_totals": {
+    "Miami FL": {
+     "line": 34.5,
+     "over": -105,
+     "under": -125
+    },
+    "North Carolina": {
+     "line": 19.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Miami FL -14 at -112; North Carolina +14 at -108. Total: Over 53.5 at -108; Under 53.5 at -112. Moneyline: Miami FL -625; North Carolina +455. Team totals: Miami FL O/U 34.5 (-105/-125); North Carolina O/U 19.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:55:54 PM."
+  },
+  "34876675": {
+   "away": "UAB",
+   "captured_at": "2026-10-30T21:45:57-05:00",
+   "dk_event_id": "34876675",
+   "home": "South Florida",
+   "main_lines_text": "Spread +7.5 -108 -112\nTotal 41.5 -112 -108\nML +245 -305",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:46 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "South Florida": {
+     "line": 26.5,
+     "over": -105,
+     "under": -125
+    },
+    "UAB": {
+     "line": 15.5,
+     "over": -135,
+     "under": 100
+    }
+   },
+   "verbatim_detail": "Spread: UAB +7.5 at -108; South Florida -7.5 at -112. Total: Over 41.5 at -112; Under 41.5 at -108. Moneyline: UAB +245; South Florida -305. Team totals: South Florida O/U 26.5 (-105/-125); UAB O/U 15.5 (-135/+100). No main market missing or suspended. DK server time at read: 10/30/2026 9:45:57 PM."
+  },
+  "34876676": {
+   "away": "UTEP",
+   "captured_at": "2026-10-30T21:52:46-05:00",
+   "dk_event_id": "34876676",
+   "home": "North Dakota State",
+   "main_lines_text": "Spread +24.5 -115 -105\nTotal 42.5 -115 -105\nML +1300 -2800",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "North Dakota State": {
+     "line": 33.5,
+     "over": -115,
+     "under": -115
+    },
+    "UTEP": {
+     "line": 7.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: UTEP +24.5 at -115; North Dakota State -24.5 at -105. Total: Over 42.5 at -115; Under 42.5 at -105. Moneyline: UTEP +1300; North Dakota State -2800. Team totals: North Dakota State O/U 33.5 (-115/-115); UTEP O/U 7.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:52:46 PM."
+  },
+  "34876677": {
+   "away": "SMU",
+   "captured_at": "2026-10-30T21:45:41-05:00",
+   "dk_event_id": "34876677",
+   "home": "Syracuse",
+   "main_lines_text": "Spread -10 -108 -112\nTotal 58.5 -105 -115\nML -360 +285",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:45 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "SMU": {
+     "line": 34.5,
+     "over": -110,
+     "under": -115
+    },
+    "Syracuse": {
+     "line": 23.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: SMU -10 at -108; Syracuse +10 at -112. Total: Over 58.5 at -105; Under 58.5 at -115. Moneyline: SMU -360; Syracuse +285. Team totals (default lines): SMU O/U 34.5 (-110/-115); Syracuse O/U 23.5 (-120/-110). Pregame, no main market missing or suspended. DK server time at read: 10/30/2026 9:45:41 PM."
+  },
+  "34876678": {
+   "away": "Bowling Green",
+   "captured_at": "2026-10-30T21:45:54-05:00",
+   "dk_event_id": "34876678",
+   "home": "Western Michigan",
+   "main_lines_text": "Spread +14 -110 -110\nTotal 44.5 -115 -105\nML +440 -600",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:46 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "Bowling Green": {
+     "line": 14.5,
+     "over": -110,
+     "under": -120
+    },
+    "Western Michigan": {
+     "line": 29.5,
+     "over": -115,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Bowling Green +14 at -110; Western Michigan -14 at -110. Total: Over 44.5 at -115; Under 44.5 at -105. Moneyline: Bowling Green +440; Western Michigan -600. Team totals: Bowling Green O/U 14.5 (-110/-120); Western Michigan O/U 29.5 (-115/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:45:54 PM."
+  },
+  "34876679": {
+   "away": "Boston College",
+   "captured_at": "2026-10-30T21:45:58-05:00",
+   "dk_event_id": "34876679",
+   "home": "Duke",
+   "main_lines_text": "Spread +7 -110 -110\nTotal 48.5 -110 -110\nML +225 -278",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:46 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "Boston College": {
+     "line": 20.5,
+     "over": -115,
+     "under": -115
+    },
+    "Duke": {
+     "line": 27.5,
+     "over": -120,
+     "under": -105
+    }
+   },
+   "verbatim_detail": "Spread: Boston College +7 at -110; Duke -7 at -110. Total: Over 48.5 at -110; Under 48.5 at -110. Moneyline: Boston College +225; Duke -278. Team totals: Boston College O/U 20.5 (-115/-115); Duke O/U 27.5 (-120/-105). No market missing or suspended. DK server time at read: 10/30/2026 9:45:58 PM."
+  },
+  "34876680": {
+   "away": "Washington",
+   "captured_at": "2026-10-30T21:55:02-05:00",
+   "dk_event_id": "34876680",
+   "home": "Nebraska",
+   "main_lines_text": "Spread +7.5 -115 -105\nTotal 49.5 -115 -105\nML +240 -298",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:54-21:55 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T19:00:00-05:00",
+   "team_totals": {
+    "Nebraska": {
+     "line": 29.5,
+     "over": -115,
+     "under": -115
+    },
+    "Washington": {
+     "line": 20.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Washington +7.5 at -115; Nebraska -7.5 at -105. Total: Over 49.5 at -115; Under 49.5 at -105. Moneyline: Washington +240; Nebraska -298. Team totals: Nebraska O/U 29.5 (-115/-115); Washington O/U 20.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:55:02 PM."
+  },
+  "34876681": {
+   "away": "Virginia",
+   "captured_at": "2026-10-30T21:53:07-05:00",
+   "dk_event_id": "34876681",
+   "home": "Wake Forest",
+   "main_lines_text": "Spread +12.5 -108 -112\nTotal 48.5 -102 -118\nML +390 -520",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:45:00-05:00",
+   "team_totals": {
+    "Virginia": {
+     "line": 16.5,
+     "over": -135,
+     "under": 105
+    },
+    "Wake Forest": {
+     "line": 30.5,
+     "over": -115,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Virginia +12.5 at -108; Wake Forest -12.5 at -112. Total: Over 48.5 at -102; Under 48.5 at -118. Moneyline: Virginia +390; Wake Forest -520. Team totals: Virginia O/U 16.5 (-135/+105); Wake Forest O/U 30.5 (-115/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:53:07 PM."
+  },
+  "34876687": {
+   "away": "Mississippi State",
+   "captured_at": "2026-10-30T21:53:40-05:00",
+   "dk_event_id": "34876687",
+   "home": "Texas",
+   "main_lines_text": "Spread +20.5 -115 -105\nTotal 50.5 -115 -105\nML +900 -1600",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:52-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:30:00-05:00",
+   "team_totals": {
+    "Mississippi State": {
+     "line": 14.5,
+     "over": -105,
+     "under": -120
+    },
+    "Texas": {
+     "line": 34.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Mississippi State +20.5 at -115; Texas -20.5 at -105. Total: Over 50.5 at -115; Under 50.5 at -105. Moneyline: Mississippi State +900; Texas -1600. Team totals: Mississippi State O/U 14.5 (-105/-120); Texas O/U 34.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:53:40 PM."
+  },
+  "34876688": {
+   "away": "Auburn",
+   "captured_at": "2026-10-30T21:48:51-05:00",
+   "dk_event_id": "34876688",
+   "home": "Ole Miss",
+   "main_lines_text": "Spread +11.5 -110 -110\nTotal 57.5 -112 -108\nML +360 -470",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:49 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:45:00-05:00",
+   "team_totals": {
+    "Auburn": {
+     "line": 22.5,
+     "over": -115,
+     "under": -115
+    },
+    "Ole Miss": {
+     "line": 34.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Auburn +11.5 at -110; Ole Miss -11.5 at -110. Total: Over 57.5 at -112; Under 57.5 at -108. Moneyline: Auburn +360; Ole Miss -470. Team totals: Auburn O/U 22.5 (-115/-115); Ole Miss O/U 34.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:48:51 PM."
+  },
+  "34876693": {
+   "away": "Minnesota",
+   "captured_at": "2026-10-30T21:50:30-05:00",
+   "dk_event_id": "34876693",
+   "home": "Indiana",
+   "main_lines_text": "Spread +20.5 -112 -108\nTotal 40.5 -118 -102\nML +850 -1450",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Indiana": {
+     "line": 30.5,
+     "over": -120,
+     "under": -110
+    },
+    "Minnesota": {
+     "line": 9.5,
+     "over": -130,
+     "under": 100
+    }
+   },
+   "verbatim_detail": "Spread: Minnesota +20.5 at -112; Indiana -20.5 at -108. Total: Over 40.5 at -118; Under 40.5 at -102. Moneyline: Minnesota +850; Indiana -1450. Team totals: Indiana O/U 30.5 (-120/-110); Minnesota O/U 9.5 (-130/+100). No market missing or suspended. DK server time at read: 10/30/2026 9:50:30 PM."
+  },
+  "34876694": {
+   "away": "Oregon State",
+   "captured_at": "2026-10-30T21:56:51-05:00",
+   "dk_event_id": "34876694",
+   "home": "Fresno State",
+   "main_lines_text": "Spread -6 -110 -110\nTotal 58.5 -105 -115\nML -230 +190",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:54-21:57 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T22:00:00-05:00",
+   "team_totals": {
+    "Fresno State": {
+     "line": 24.5,
+     "over": -125,
+     "under": -105
+    },
+    "Oregon State": {
+     "line": 32.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: Oregon State -6 at -110; Fresno State +6 at -110. Total: Over 58.5 at -105; Under 58.5 at -115. Moneyline: Oregon State -230; Fresno State +190. Team totals: Oregon State O/U 32.5 (-110/-120); Fresno State O/U 24.5 (-125/-105). No market missing or suspended. DK server time at read: 10/30/2026 9:56:51 PM."
+  },
+  "34876695": {
+   "away": "Purdue",
+   "captured_at": "2026-10-30T21:54:30-05:00",
+   "dk_event_id": "34876695",
+   "home": "Penn State",
+   "main_lines_text": "Spread +10 -105 -115\nTotal 54.5 -108 -112\nML +295 -375",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:54 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "team_totals": {
+    "Penn State": {
+     "line": 32.5,
+     "over": -120,
+     "under": -110
+    },
+    "Purdue": {
+     "line": 22.5,
+     "over": 100,
+     "under": -135
+    }
+   },
+   "verbatim_detail": "Spread: Purdue +10 at -105; Penn State -10 at -115. Total: Over 54.5 at -108; Under 54.5 at -112. Moneyline: Purdue +295; Penn State -375. Team totals: Penn State O/U 32.5 (-120/-110); Purdue O/U 22.5 (+100/-135). No market missing or suspended. Read 10/30/2026 ~9:54 PM CDT (minute precision as reported)."
+  },
+  "34876696": {
+   "away": "Nevada",
+   "captured_at": "2026-10-30T21:53:02-05:00",
+   "dk_event_id": "34876696",
+   "home": "UCLA",
+   "main_lines_text": "Spread +22.5 -112 -108\nTotal 43.5 -115 -105\nML +1000 -1800",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "team_totals": {
+    "Nevada": {
+     "line": 10.5,
+     "over": 110,
+     "under": -145
+    },
+    "UCLA": {
+     "line": 31.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Nevada +22.5 at -112; UCLA -22.5 at -108. Total: Over 43.5 at -115; Under 43.5 at -105. Moneyline: Nevada +1000; UCLA -1800. Team totals: Nevada O/U 10.5 (+110/-145); UCLA O/U 31.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:53:02 PM."
+  },
+  "34876697": {
+   "away": "Notre Dame",
+   "captured_at": "2026-10-30T21:45:52-05:00",
+   "dk_event_id": "34876697",
+   "home": "Navy",
+   "main_lines_text": "Spread -30.5 -112 -108\nTotal 56.5 -108 -112\nML -6500 +2000",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:46 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "Navy": {
+     "line": 13.5,
+     "over": -115,
+     "under": -115
+    },
+    "Notre Dame": {
+     "line": 43.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Notre Dame -30.5 at -112; Navy +30.5 at -108. Total: Over 56.5 at -108; Under 56.5 at -112. Moneyline: Notre Dame -6500; Navy +2000. Team totals: Notre Dame O/U 43.5 (-115/-115); Navy O/U 13.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:45:52 PM."
+  },
+  "34876698": {
+   "away": "South Carolina",
+   "captured_at": "2026-10-30T21:53:08-05:00",
+   "dk_event_id": "34876698",
+   "home": "Oklahoma",
+   "main_lines_text": "Spread +3.5 -115 -105\nTotal 44.5 -108 -112\nML +142 -170",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:53 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T15:15:00-05:00",
+   "team_totals": {
+    "Oklahoma": {
+     "line": 23.5,
+     "over": -125,
+     "under": -105
+    },
+    "South Carolina": {
+     "line": 20.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: South Carolina +3.5 at -115; Oklahoma -3.5 at -105. Total: Over 44.5 at -108; Under 44.5 at -112. Moneyline: South Carolina +142; Oklahoma -170. Team totals: Oklahoma O/U 23.5 (-125/-105); South Carolina O/U 20.5 (-110/-120). No market missing or suspended. DK server time at read: 10/30/2026 9:53:08 PM."
+  },
+  "34876700": {
+   "away": "New Mexico",
+   "captured_at": "2026-10-30T21:52:35-05:00",
+   "dk_event_id": "34876700",
+   "home": "San Jose State",
+   "main_lines_text": "Spread -14.5 -115 -105\nTotal 42.5 -110 -110\nML -650 +470",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:51-21:52 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T15:00:00-05:00",
+   "team_totals": {
+    "New Mexico": {
+     "line": 29.5,
+     "over": -105,
+     "under": -125
+    },
+    "San Jose State": {
+     "line": 13.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: New Mexico -14.5 at -115; San Jose State +14.5 at -105. Total: Over 42.5 at -110; Under 42.5 at -110. Moneyline: New Mexico -650; San Jose State +470. Team totals: New Mexico O/U 29.5 (-105/-125); San Jose State O/U 13.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:52:35 PM."
+  },
+  "34876701": {
+   "away": "Kansas State",
+   "captured_at": "2026-10-30T21:48:08-05:00",
+   "dk_event_id": "34876701",
+   "home": "Colorado",
+   "main_lines_text": "Spread +3 -112 -108\nTotal 46.5 -115 -105\nML +130 -155",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "team_totals": {
+    "Colorado": {
+     "line": 24.5,
+     "over": -105,
+     "under": -125
+    },
+    "Kansas State": {
+     "line": 22.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: Kansas State +3 at -112; Colorado -3 at -108. Total: Over 46.5 at -115; Under 46.5 at -105. Moneyline: Kansas State +130; Colorado -155. Team totals: Colorado O/U 24.5 (-105/-125); Kansas State O/U 22.5 (-110/-120). No market missing or suspended. DK server time at read: 10/30/2026 9:48:08 PM."
+  },
+  "34876702": {
+   "away": "Missouri",
+   "captured_at": "2026-10-30T21:57:16-05:00",
+   "dk_event_id": "34876702",
+   "home": "Arkansas",
+   "main_lines_text": "Spread -10 -112 -108\nTotal 48.5 -110 -110\nML -380 +300",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:53-21:57 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:45:00-05:00",
+   "team_totals": {
+    "Arkansas": {
+     "line": 17.5,
+     "over": -120,
+     "under": -110
+    },
+    "Missouri": {
+     "line": 30.5,
+     "over": -105,
+     "under": -125
+    }
+   },
+   "verbatim_detail": "Spread: Missouri -10 at -112; Arkansas +10 at -108. Total: Over 48.5 at -110; Under 48.5 at -110. Moneyline: Missouri -380; Arkansas +300. Team totals: Arkansas O/U 17.5 (-120/-110); Missouri O/U 30.5 (-105/-125). No main market missing or suspended. DK server time at read: 10/30/2026 9:57:16 PM."
+  },
+  "34876703": {
+   "away": "UConn",
+   "captured_at": "2026-10-30T21:48:05-05:00",
+   "dk_event_id": "34876703",
+   "home": "Air Force",
+   "main_lines_text": "Spread +1.5 -122 +102\nTotal 51.5 -115 -105\nML -110 -110",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "team_totals": {
+    "Air Force": {
+     "line": 26.5,
+     "over": -115,
+     "under": -115
+    },
+    "UConn": {
+     "line": 26.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: UConn +1.5 at -122; Air Force -1.5 at +102. Total: Over 51.5 at -115; Under 51.5 at -105. Moneyline: UConn -110; Air Force -110 (both exactly as rendered). Team totals: Air Force O/U 26.5 (-115/-115); UConn O/U 26.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:48:05 PM."
+  },
+  "34876704": {
+   "away": "Coastal Carolina",
+   "captured_at": "2026-10-30T21:48:06-05:00",
+   "dk_event_id": "34876704",
+   "home": "Georgia State",
+   "main_lines_text": "Spread +4 -112 -108\nTotal 55.5 -112 -108\nML +154 -185",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:48 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T13:00:00-05:00",
+   "team_totals": {
+    "Coastal Carolina": {
+     "line": 26.5,
+     "over": -110,
+     "under": -120
+    },
+    "Georgia State": {
+     "line": 30.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Coastal Carolina +4 at -112; Georgia State -4 at -108. Total: Over 55.5 at -112; Under 55.5 at -108. Moneyline: Coastal Carolina +154; Georgia State -185. Team totals: Coastal Carolina O/U 26.5 (-110/-120); Georgia State O/U 30.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:48:06 PM."
+  },
+  "34876705": {
+   "away": "Arizona State",
+   "captured_at": "2026-10-30T21:50:21-05:00",
+   "dk_event_id": "34876705",
+   "home": "BYU",
+   "main_lines_text": "Spread +16.5 -112 -108\nTotal 48.5 -102 -118\nML +525 -750",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Arizona State": {
+     "line": 14.5,
+     "over": -120,
+     "under": -110
+    },
+    "BYU": {
+     "line": 31.5,
+     "over": -115,
+     "under": -115
+    }
+   },
+   "verbatim_detail": "Spread: Arizona State +16.5 at -112; BYU -16.5 at -108. Total: Over 48.5 at -102; Under 48.5 at -118. Moneyline: Arizona State +525; BYU -750. Team totals: Arizona State O/U 14.5 (-120/-110); BYU O/U 31.5 (-115/-115). No market missing or suspended. DK server time at read: 10/30/2026 9:50:21 PM."
+  },
+  "34876706": {
+   "away": "Kansas",
+   "captured_at": "2026-10-30T21:50:23-05:00",
+   "dk_event_id": "34876706",
+   "home": "TCU",
+   "main_lines_text": "Spread +6.5 -110 -110\nTotal 45.5 -110 -110\nML +195 -238",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:48-21:50 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:30:00-05:00",
+   "team_totals": {
+    "Kansas": {
+     "line": 19.5,
+     "over": -120,
+     "under": -110
+    },
+    "TCU": {
+     "line": 25.5,
+     "over": -125,
+     "under": -105
+    }
+   },
+   "verbatim_detail": "Spread: Kansas +6.5 at -110; TCU -6.5 at -110. Total: Over 45.5 at -110; Under 45.5 at -110. Moneyline: Kansas +195; TCU -238. Team totals: Kansas O/U 19.5 (-120/-110); TCU O/U 25.5 (-125/-105). No market missing or suspended. DK server time at read: 10/30/2026 9:50:23 PM."
+  },
+  "34876707": {
+   "away": "Louisiana Tech",
+   "captured_at": "2026-10-30T21:47:32-05:00",
+   "dk_event_id": "34876707",
+   "home": "South Alabama",
+   "main_lines_text": "Spread -6 -112 -108\nTotal 58.5 -108 -112\nML -225 +185",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:46-21:47 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T14:00:00-05:00",
+   "team_totals": {
+    "Louisiana Tech": {
+     "line": 31.5,
+     "over": -115,
+     "under": -110
+    },
+    "South Alabama": {
+     "line": 25.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Louisiana Tech -6 at -112; South Alabama +6 at -108. Total: Over 58.5 at -108; Under 58.5 at -112. Moneyline: Louisiana Tech -225; South Alabama +185. Team totals: Louisiana Tech O/U 31.5 (-115/-110); South Alabama O/U 25.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:47:32 PM."
+  },
+  "34876708": {
+   "away": "Oklahoma State",
+   "captured_at": "2026-10-30T21:55:00-05:00",
+   "dk_event_id": "34876708",
+   "home": "Iowa State",
+   "main_lines_text": "Spread -9.5 -112 -108\nTotal 57.5 -115 -105\nML -360 +285",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:53-21:55 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T18:00:00-05:00",
+   "team_totals": {
+    "Iowa State": {
+     "line": 23.5,
+     "over": -120,
+     "under": -110
+    },
+    "Oklahoma State": {
+     "line": 34.5,
+     "over": -110,
+     "under": -120
+    }
+   },
+   "verbatim_detail": "Spread: Oklahoma State -9.5 at -112; Iowa State +9.5 at -108. Total: Over 57.5 at -115; Under 57.5 at -105. Moneyline: Oklahoma State -360; Iowa State +285. Team totals: Oklahoma State O/U 34.5 (-110/-120); Iowa State O/U 23.5 (-120/-110). No market missing or suspended. DK server time at read: 10/30/2026 9:55:00 PM."
+  },
+  "34876709": {
+   "away": "Arizona",
+   "captured_at": "2026-10-30T21:45:14-05:00",
+   "dk_event_id": "34876709",
+   "home": "Texas Tech",
+   "main_lines_text": "Spread +3.5 -108 -112\nTotal 54.5 -105 -115\nML +150 -180",
+   "source": "DK rendered event page, signed out, live-browser single-game capture dispatched by parent (Fri Oct 30, 2026 21:44-21:45 CT)",
+   "sport": "CFB",
+   "start_ct": "2026-10-31T11:00:00-05:00",
+   "team_totals": {
+    "Arizona": {
+     "line": 25.5,
+     "over": -105,
+     "under": -125
+    },
+    "Texas Tech": {
+     "line": 28.5,
+     "over": -120,
+     "under": -110
+    }
+   },
+   "verbatim_detail": "Spread: Arizona +3.5 at -108; Texas Tech -3.5 at -112. Total: Over 54.5 at -105; Under 54.5 at -115. Moneyline: Arizona +150; Texas Tech -180. Team totals: Arizona O/U 25.5 (-105/-125); Texas Tech O/U 28.5 (-120/-110). Pregame, no market missing or suspended. DK server time at read: 10/30/2026 9:45:14 PM."
+  }
+ },
+ "missing_event_ids": [],
+ "run": "operative_run_20261031_cfb"
+}
