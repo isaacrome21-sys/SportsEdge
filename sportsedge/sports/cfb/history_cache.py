@@ -394,3 +394,7 @@ def _verify_market_manifest(path: Path, contract: dict) -> None:
     claimed = manifest.pop("manifest_sha256", None)
     if claimed != contract_digest(manifest):
         raise CFBHistoryCacheError("CFB_MARKET_CACHE_MANIFEST_HASH_MISMATCH")
+
+
+# Public alias for research/benchmark scripts
+iter_market_archive = _iter_market_archive
