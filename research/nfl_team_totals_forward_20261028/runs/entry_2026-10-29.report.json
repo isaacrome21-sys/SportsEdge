@@ -1,0 +1,18 @@
+{
+ "captures_sha256": "286f44eb757c60b18341bc725bcec3650e1f11034d3e33e1c415475052085f2f",
+ "command": "price",
+ "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+ "driver_refusals": [],
+ "games_built": 1,
+ "games_sha256": "c8b3bcc75b55482b76c7f9e3468399f755c93be9beaa9988b5eba5cd28db1da7",
+ "history_games": 7074,
+ "history_snapshot_sha256": "1119f195385c9177f93e22fb16a6b21dad7967f238e08bb22db7e5fb2a2b1e17",
+ "lane_a_mode": "live",
+ "metrics_computed": false,
+ "notes": [],
+ "priced_at": "2026-10-29T23:30:24.928009+00:00",
+ "records_file": "research/nfl_team_totals_forward_20261028/runs/entry_2026-10-29.jsonl",
+ "records_written": 2,
+ "runner_refusals": [],
+ "slate_date": "2026-10-29"
+}

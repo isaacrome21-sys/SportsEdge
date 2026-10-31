@@ -1,0 +1,25 @@
+{
+ "34118182": {
+  "capture_type": "OPERATIVE_RUN_IT_CAPTURE",
+  "event": "Carolina Panthers @ Green Bay Packers",
+  "event_id": 34118182,
+  "game_id": "2026_08_CAR_GB",
+  "game_lines": {
+   "moneyline": {"away_price": 154, "captured_at": "2026-10-29T18:29:12-05:00", "home_price": -185},
+   "spread": {"away_line": 3.5, "away_price": -110, "captured_at": "2026-10-29T18:29:12-05:00", "home_line": -3.5, "home_price": -110},
+   "team_totals": {
+    "Panthers": {"captured_at": "2026-10-29T18:28:30-05:00", "line": 20.5, "over_price": -130, "under_price": 100},
+    "Packers": {"captured_at": "2026-10-29T18:28:30-05:00", "line": 24.5, "over_price": -125, "under_price": -105}
+   },
+   "total": {"captured_at": "2026-10-29T18:29:12-05:00", "line": 47.5, "over_price": -105, "under_price": -115}
+  },
+  "kickoff_ct": "2026-10-29T19:15:00-05:00",
+  "operative_read_at": "2026-10-29T18:28:30-05:00",
+  "season": 2026,
+  "source": "DraftKings",
+  "source_view": "DK rendered event page, signed out; team totals ex Team Props > Team Totals, page server time 2026-10-29 18:28:30 CT; game lines re-read 18:29:12 CT",
+  "sport": "NFL",
+  "status": "CAPTURED",
+  "week": 8
+ }
+}

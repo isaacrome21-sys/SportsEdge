@@ -2,8 +2,9 @@
 (sportsedge/cbb_team_total_forward.py).
 
 The readout family is NOT FROZEN: counted entry points refuse
-CBB_TEAM_TOTAL_FORWARD_NOT_FROZEN, records are NON_COUNTED with the
-G-1/G-2/G-3 stamps, the forward accuracy leg names the SIMPLE
+CBB_TEAM_TOTAL_FORWARD_NOT_FROZEN, records are NON_COUNTED and
+carry their Amendment 2 section 1 designation at the TEAM_TOTAL
+threshold 2.1, the forward accuracy leg names the SIMPLE
 baseline only (package answer A-1 — no naive value is recorded),
 and model team points are exactly the parent construction's
 expected team points.
@@ -17,6 +18,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from sportsedge import cbb_amendment2_machinery as amendment2
 from sportsedge import cbb_torvik_efficiency_v1 as core
 from sportsedge.cbb_team_total_forward import (
     CbbTeamTotalForwardRunner,
@@ -104,14 +106,37 @@ def test_happy_path_two_team_records_readout_of_parent(runner,
         expected["expected_points_home_candidate"]
     for rec in out["records"]:
         assert rec["counted"] is False
-        assert rec["classification"] == "PICK_RULE_UNDEFINED"
-        assert rec["pick"] is None
-        assert rec["close_rule"] == "CLOSE_RULE_UNDEFINED_GAP_G3"
+        # Amendment 2 section 1 designation, TEAM_TOTAL threshold.
+        expected = amendment2.designate_pick(
+            "TEAM_TOTAL", rec["model_team_points_candidate"],
+            rec["line"])
+        assert rec["gap"] == expected["gap"]
+        assert rec["designated_side"] == expected["designated_side"]
+        assert rec["classification"] == expected["classification"]
+        assert rec["pick"] == (
+            expected["designated_side"]
+            if expected["classification"] == "PICKED" else None)
+        assert rec["pick_threshold"] == 2.1
+        assert rec["pick_rule"] == "AMENDMENT_2_S1_PICK_RULE"
+        assert rec["close_rule"] == "AMENDMENT_2_S3_CLOSE_VALIDITY"
+        assert rec["amendment_2_sha256"] == \
+            "25be46029ca1933e1a2eb7d7aa6a858928f3879a254285e90a0b9bf1270d926a"
         # A-1: simple baseline ONLY forward — no naive field exists.
         assert rec["forward_baselines"] == ["SIMPLE_RATINGS"]
         assert not any("naive" in k for k in rec)
         assert rec["construction_of_record_sha256"] == \
             "ac01327a4ed3bb9a37f03e7a9391d2a0918d4f022c86de42bb841a9f15044989"
+
+
+def test_designated_pick_lands_on_the_record(runner, vintage):
+    game = _game(quotes={"TEAM_TOTAL_AWAY": _quote(70.0)})
+    out = runner.price_slate(SLATE, [game], vintage=vintage, now=NOW)
+    duke = [r for r in out["records"] if r["team"] == "duke"][0]
+    # Duke's expected points (~75.5) against a 70.0 line clear the
+    # 2.1 threshold: a PICKED OVER row, designated before tip.
+    assert duke["classification"] == "PICKED"
+    assert duke["designated_side"] == "OVER" and duke["pick"] == "OVER"
+    assert duke["gap"] == duke["model_team_points_candidate"] - 70.0
 
 
 def test_counted_entry_points_refuse_not_frozen(runner, vintage):
