@@ -164,6 +164,7 @@ def test_three_seasons_cannot_fake_four_season_requirement():
     d = cohort()
     for i in range(50):
         d["samples"][i]["season"] = "2023-24"
+        d["samples"][i]["game_start_utc"] = "2024-03-15T19:00:00Z"
     r = run(d)
     assert r["seasons_count"] == 3
     assert not r["cohort_numeric_requirement_met_unverified"]
