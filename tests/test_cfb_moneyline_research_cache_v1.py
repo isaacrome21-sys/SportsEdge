@@ -204,7 +204,7 @@ class CFBMoneylineResearchCacheTests(unittest.TestCase):
         rows = cache.ensure(
             ["ml_research_2024"], "fake", cache={}, budget=1,
             fetch=lambda path, params, key: raw,
-            save=lambda name, data: attempted.append(name) and False,
+            save=lambda name, data: attempted.append(name) or False,
             sleep=lambda _: None,
         )
         self.assertEqual(attempted, ["ml_research_2024"])
