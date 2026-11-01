@@ -105,8 +105,8 @@ def test_settle_isolates_missing_atomic_clock_to_affected_team(tmp_path):
     games = tmp_path / "games.csv"
     games.write_text(
         "game_id,season,game_type,week,gameday,away_team,away_score,"
-        "home_team,home_score\\n"
-        "2026_09_SF_ATL,2026,REG,9,2026-11-01,SF,20,ATL,29\\n")
+        "home_team,home_score\n"
+        "2026_09_SF_ATL,2026,REG,9,2026-11-01,SF,20,ATL,29\n")
     captures = tmp_path / "captures.json"
     captures.write_text(json.dumps({"1": {
         "sport": "NFL",
@@ -124,7 +124,7 @@ def test_settle_isolates_missing_atomic_clock_to_affected_team(tmp_path):
         "row_id": f"{game_id}:{team}", "game_id": game_id,
         "team": team, "kickoff": kickoff,
         "entry": {"line": line}, "gap": 1.0,
-    }) + "\\n" for team, line in (("SF", 26.5), ("ATL", 23.5))))
+    }) + "\n" for team, line in (("SF", 26.5), ("ATL", 23.5))))
     output = tmp_path / "settled.jsonl"
     args = SimpleNamespace(records=str(records), captures=str(captures),
                            games=str(games), out=str(output), void_game=None)
