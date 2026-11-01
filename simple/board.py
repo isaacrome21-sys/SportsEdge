@@ -8,6 +8,7 @@ One command:  python simple/board.py run OUT_DIR
      complete outcome group), EV of the DK price = p * dk_decimal - 1. Bets: EV >= MIN_EV. EV > MAX_EV is
      dropped as a likely mapping error.
 Hard cap: MAX_CALLS_PER_DAY OddsPapi calls (owner budget 20/day, #2447 6561970754), counted in OUT_DIR/calls.json.
+A calls.json that exists but cannot be read as a JSON object fails closed (no calls).
 NHL is paused and MLB DK auto-acquisition is off, so neither is requested.
 The key comes from SPORTSEDGE_ODDSPAPI_KEY and is never printed or written.
 `python simple/board.py selftest` runs offline checks with synthetic payloads.
@@ -31,25 +32,38 @@ class Refused(Exception):
 
 # ---------- budget ----------
 class Budget:
+    """Daily call counter in a JSON file. A missing file is a fresh start. A file that exists
+    but is unreadable, not JSON, or not an object fails CLOSED: no calls until it is fixed."""
+
     def __init__(self, path, day, cap=MAX_CALLS_PER_DAY):
         self.path, self.day, self.cap = path, day, cap
-        try:
-            self.log = json.load(open(path))
-        except (OSError, ValueError):
-            self.log = {}
-        if not isinstance(self.log, dict):
-            self.log = {}
+        self.corrupt, self.log = False, {}
+        if os.path.lexists(path):
+            try:
+                with open(path) as fh:
+                    self.log = json.load(fh)
+            except (OSError, ValueError):
+                self.corrupt = True
+            if not isinstance(self.log, dict):
+                self.log, self.corrupt = {}, True
 
     def used(self):
+        if self.corrupt:
+            return self.cap
         v = self.log.get(self.day, 0)
-        return v if isinstance(v, int) and v >= 0 else self.cap
+        return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else self.cap
 
     def spend(self):
+        if self.corrupt:
+            raise Refused("BUDGET_FILE_CORRUPT")
         if self.used() >= self.cap:
             raise Refused("DAILY_CALL_CAP_REACHED")
         self.log[self.day] = self.used() + 1
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        json.dump(self.log, open(self.path, "w"), indent=1, sort_keys=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(self.log, fh, indent=1, sort_keys=True)
+        os.replace(tmp, self.path)
 
 
 def get(endpoint, params, key, budget, opener=urlopen):
@@ -298,6 +312,28 @@ def selftest():
     except Refused:
         pass
     assert Budget(os.path.join(d, "c.json"), "2026-11-01", cap=2).used() == 2
+    # corrupt / non-object budget file fails closed and is left untouched (review 5729925753)
+    for bad in ("{broken", "[1, 2]", "null", '"x"'):
+        p = os.path.join(d, "bad.json")
+        with open(p, "w") as fh:
+            fh.write(bad)
+        bb = Budget(p, "2026-11-01", cap=2)
+        assert bb.used() == 2, bad
+        try:
+            bb.spend(); raise AssertionError("corrupt budget not refused: " + bad)
+        except Refused as e:
+            assert str(e) == "BUDGET_FILE_CORRUPT", e
+        with open(p) as fh:
+            assert fh.read() == bad
+    # bad count for today fails closed
+    for badv in (True, -1, 1.5, "3"):
+        p = os.path.join(d, "v.json")
+        with open(p, "w") as fh:
+            json.dump({"2026-11-01": badv}, fh)
+        assert Budget(p, "2026-11-01", cap=2).used() == 2, badv
+    # unreadable path (a directory) fails closed
+    os.mkdir(os.path.join(d, "dir.json"))
+    assert Budget(os.path.join(d, "dir.json"), "2026-11-01", cap=2).corrupt
     print("selftest ok")
 
 
