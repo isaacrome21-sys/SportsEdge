@@ -15,7 +15,10 @@ Guards (reviews 5726665611 and 5726872447 on #2979):
 - (review 5727284389 on #2995) raw BIAS_JSON rows are validated BEFORE any season filter or
   `actual > L` comparison: each row must be exactly [season, mu, actual], all finite, with
   season 2025 or 2026; anything else (NaN/Inf actuals, NaN or other seasons, ragged or text
-  rows) makes the market INVALID instead of being laundered into 0/1 labels or dropped.
+  rows) makes the market INVALID instead of being laundered into 0/1 labels or dropped;
+- (review 5727663452 on #2995) original raw cell types are checked BEFORE any float
+  coercion: every cell must be a JSON number (int/float), never bool, str, null or nested;
+  JSON `true` or "30" makes the market INVALID instead of becoming 1.0 / 30.0.
 `python nfl_prop_oos.py --self-test` runs synthetic regressions without the pricer or data.
 """
 import importlib.util
@@ -59,16 +62,26 @@ def brier(r, s):
 SEASONS = (2025.0, 2026.0)
 
 
+def _raw_cell_ok(c):
+    """A raw cell must be a real int/float (JSON number). bool and str are refused before any
+    coercion, so `true` -> 1.0 and "30" -> 30.0 can never be laundered (review 5727663452)."""
+    return isinstance(c, (int, float, np.integer, np.floating)) and not isinstance(
+        c, (bool, np.bool_))
+
+
 def validate_raw(v):
     """Return (array (n, 3), None) or (None, INVALID reason). Runs before any filter/compare."""
-    try:
-        a = np.asarray(v, dtype=float)
-    except (TypeError, ValueError) as exc:
-        return None, f"INVALID: raw rows not numeric ({type(exc).__name__})"
-    if a.size == 0:
-        return a.reshape(-1, 3), None
-    if a.ndim != 2 or a.shape[1] != 3:
-        return None, f"INVALID: raw rows must be [season, mu, actual], got shape {a.shape}"
+    if not isinstance(v, (list, tuple)):
+        return None, f"INVALID: raw rows must be a list, got {type(v).__name__}"
+    for i, row in enumerate(v):
+        if not isinstance(row, (list, tuple)) or len(row) != 3:
+            return None, f"INVALID: raw rows must be [season, mu, actual], row {i} is {row!r}"
+        bad = [type(c).__name__ for c in row if not _raw_cell_ok(c)]
+        if bad:
+            return None, f"INVALID: raw row {i} has non-numeric cell type(s) {bad}"
+    if len(v) == 0:
+        return np.empty((0, 3)), None
+    a = np.asarray(v, dtype=float)
     bad_fin = ~np.isfinite(a).all(axis=1)
     bad_season = ~np.isin(a[:, 0], SEASONS)  # NaN season fails here too
     if bad_fin.any() or bad_season.any():
@@ -185,6 +198,24 @@ def self_test():
           (tr, te))
     res, why = evaluate(tr, te)
     check(why is None and all(np.isfinite(x) for x in res.values()), (res, why))
+    # review 5727663452 repros (#2995): bool / numeric-string raw cells are refused by type
+    for bad_rows in ([[2025, 25.0, True]], [[2025, 25.0, "30"]], [[True, 25.0, 30.0]],
+                     [[2025, False, 30.0]], [["2025", 25.0, 30.0]], [[2025, 25.0, None]],
+                     [[2025, 25.0, [30.0]]], [(2025, 25.0, np.bool_(True))]):
+        tr, te, why = market_rows(bad_rows, fake_p)
+        check(tr is None and why is not None and why.startswith("INVALID: raw"), (bad_rows, why))
+    # the same refusal end to end, from JSON text as main() reads it
+    tr, te, why = market_rows(json.loads('[[2025, 25.0, 30.0], [2026, 25.0, true]]'), fake_p)
+    check(tr is None and "bool" in why, why)
+    tr, te, why = market_rows(json.loads('[[2025, 25.0, 30.0], [2026, 25.0, "30"]]'), fake_p)
+    check(tr is None and "str" in why, why)
+    # non-list market payloads are INVALID, not iterated character by character
+    for bad_v in ("2025,25,30", {"a": 1}, None, 3):
+        tr, te, why = market_rows(bad_v, fake_p)
+        check(tr is None and why.startswith("INVALID: raw"), (bad_v, why))
+    # integer JSON numbers (int season/actual) stay legal
+    tr, te, why = market_rows(json.loads('[[2025, 25, 30], [2026, 25, 27]]'), fake_p)
+    check(why is None and tr.shape == (3, 2), why)
     # empty market is still SKIPPED (not INVALID, not NaN)
     tr, te, why = market_rows([], fake_p)
     check(why is None, why)
