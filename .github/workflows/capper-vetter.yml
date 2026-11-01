@@ -1,0 +1,78 @@
+name: capper-vetter
+
+# CAPPER_VETTER_V1 (EXTERNAL_EV add-on). Reads "[CAPPER]" issues, pulls tip
+# times, DK closes and finals from ESPN's free public scoreboard, grades each
+# outside account, and posts the ranked table on the "[CAPPER RANKINGS]"
+# issue. Writes nothing to the repository (freeze-reconciliation hold);
+# outputs are an artifact plus an issue comment.
+on:
+  pull_request:
+    paths:
+      - 'sportsedge/capper_vetter.py'
+      - 'sportsedge/capper_pipeline.py'
+      - 'scripts/run_capper_vetter.py'
+      - 'config/capper_vetter_v1.json'
+      - 'tests/test_capper_vetter.py'
+      - 'tests/test_capper_pipeline.py'
+      - '.github/workflows/capper-vetter.yml'
+  issues:
+    types: [opened, edited]
+  schedule:
+    - cron: '17 11 * * *'   # 5:17 AM CT standard time: settle yesterday's games
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: capper-vetter
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - run: |
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+          python -m pytest -q tests/test_capper_vetter.py tests/test_capper_pipeline.py
+
+  grade:
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[CAPPER]') &&
+       !startsWith(github.event.issue.title, '[CAPPER RANKINGS]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version-file: '.python-version'
+      - name: Grade outside cappers
+        shell: bash
+        run: |
+          # New/edited pick: check it parses, don't spam the tracker. Daily/manual: post the table.
+          if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
+            python scripts/run_capper_vetter.py
+          else
+            python scripts/run_capper_vetter.py --post
+          fi
+      - name: Add run summary
+        if: always()
+        run: test ! -f artifacts/capper_vetter/rankings.md || cat artifacts/capper_vetter/rankings.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: capper-vetter-${{ github.run_id }}
+          path: artifacts/capper_vetter/
+          if-no-files-found: warn
+          retention-days: 30
