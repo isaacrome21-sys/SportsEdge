@@ -208,12 +208,10 @@ def _team_total_quotes(entry: dict, sched) -> dict:
         # overwrite explicitly supplied side clocks with the common clock:
         # doing so can turn a >150s pair into a manufactured zero-span pair.
         stamp = value.get("captured_at")
+        # Missing/invalid common clocks pass through to the pinned runner,
+        # which refuses that team's quote per row.  Refusing here would abort
+        # settlement of unrelated, valid team rows in the same capture.
         atomic_time = _parse_ts(stamp)
-        if atomic_time is None:
-            raise DriverRefusal(
-                "DRIVER_CAPTURE_MALFORMED",
-                f"{sched.game_id}: team_totals[{key!r}] missing/invalid "
-                "atomic captured_at")
         has_over = "over_captured_at" in value
         has_under = "under_captured_at" in value
         if has_over != has_under:
@@ -223,8 +221,8 @@ def _team_total_quotes(entry: dict, sched) -> dict:
         if has_over:
             over_time = _parse_ts(value["over_captured_at"])
             under_time = _parse_ts(value["under_captured_at"])
-            if (over_time is None or under_time is None
-                    or over_time != atomic_time
+            if (atomic_time is None or over_time is None
+                    or under_time is None or over_time != atomic_time
                     or under_time != atomic_time):
                 raise DriverRefusal(
                     "DRIVER_CAPTURE_MALFORMED",
