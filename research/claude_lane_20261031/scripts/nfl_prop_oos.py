@@ -11,7 +11,11 @@ Guards (reviews 5726665611 and 5726872447 on #2979):
   [0, 1], y must be exactly 0 or 1; any malformed row makes the whole market INVALID (no
   numeric result is printed, rows are never silently dropped);
 - a market with no in-band 2025 rows or no in-band 2026 rows is reported as SKIPPED;
-- every printed number is checked finite.
+- every printed number is checked finite;
+- (review 5727284389 on #2995) raw BIAS_JSON rows are validated BEFORE any season filter or
+  `actual > L` comparison: each row must be exactly [season, mu, actual], all finite, with
+  season 2025 or 2026; anything else (NaN/Inf actuals, NaN or other seasons, ragged or text
+  rows) makes the market INVALID instead of being laundered into 0/1 labels or dropped.
 `python nfl_prop_oos.py --self-test` runs synthetic regressions without the pricer or data.
 """
 import importlib.util
@@ -50,6 +54,44 @@ def brier(r, s):
     r = as_rows(r)
     b = r[in_band(r)]
     return float(np.mean((np.clip(b[:, 0] + s, 0, 1) - b[:, 1]) ** 2))
+
+
+SEASONS = (2025.0, 2026.0)
+
+
+def validate_raw(v):
+    """Return (array (n, 3), None) or (None, INVALID reason). Runs before any filter/compare."""
+    try:
+        a = np.asarray(v, dtype=float)
+    except (TypeError, ValueError) as exc:
+        return None, f"INVALID: raw rows not numeric ({type(exc).__name__})"
+    if a.size == 0:
+        return a.reshape(-1, 3), None
+    if a.ndim != 2 or a.shape[1] != 3:
+        return None, f"INVALID: raw rows must be [season, mu, actual], got shape {a.shape}"
+    bad_fin = ~np.isfinite(a).all(axis=1)
+    bad_season = ~np.isin(a[:, 0], SEASONS)  # NaN season fails here too
+    if bad_fin.any() or bad_season.any():
+        return None, (f"INVALID: raw rows have {int(bad_fin.sum())} non-finite and"
+                      f" {int(bad_season.sum())} bad-season of {len(a)}")
+    return a, None
+
+
+def market_rows(v, p_fn):
+    """Validate raw rows, then build (p, y) per season. p_fn(mu, L) -> P(over L)."""
+    a, why = validate_raw(v)
+    if why:
+        return None, None, why
+
+    def season_rows(season):
+        out = []
+        for _s, mu, y in a[a[:, 0] == season]:
+            for off in (-0.15, 0.0, 0.15):
+                L = np.floor(mu * (1 + off)) + 0.5
+                out.append((p_fn(mu, L), float(y > L)))
+        return as_rows(out)
+
+    return season_rows(2025.0), season_rows(2026.0), None
 
 
 def evaluate(tr, te):
@@ -118,6 +160,36 @@ def self_test():
     check(abs(res["shift"] - 0.05) < 1e-12 and res["n_train"] == 2 and res["n_test"] == 2,
           res)
     check(all(np.isfinite(v) for v in res.values()), res)
+    # review 5727284389 repros (#2995): raw NaN/+Inf/-Inf actuals must not become 0/1 labels
+    fake_p = lambda mu, L: 0.5  # noqa: E731  synthetic pricer, research test only
+    for bad in (np.nan, np.inf, -np.inf):
+        tr, te, why = market_rows([[2025, 25.0, bad], [2026, 25.0, 30.0]], fake_p)
+        check(tr is None and why.startswith("INVALID: raw"), why)
+    # NaN / unknown season is INVALID, not silently dropped by the equality filter
+    for bad_season in (np.nan, 2024, 2025.5):
+        tr, te, why = market_rows([[bad_season, 25.0, 30.0], [2026, 25.0, 30.0]], fake_p)
+        check(tr is None and why.startswith("INVALID: raw"), why)
+    # non-finite mu, ragged, text and wrong-width rows are INVALID, not a crash
+    for bad_rows in ([[2025, np.nan, 30.0]], [[2025, 25.0]], [[2025, 25.0, 30.0], [2026, 1.0]],
+                     [[2025, "x", 30.0]], [[2025, 25.0, 30.0, 1.0]]):
+        tr, te, why = market_rows(bad_rows, fake_p)
+        check(tr is None and why is not None and why.startswith("INVALID: raw"), (bad_rows, why))
+    # end to end: one bad raw actual makes the whole market INVALID through evaluate's caller path
+    v = [[2025, 25.0, 30.0], [2025, 25.0, 20.0], [2026, 25.0, 30.0], [2026, 25.0, np.inf]]
+    tr, te, why = market_rows(v, fake_p)
+    check(tr is None and "1 non-finite" in why, why)
+    # valid raw rows: 3 lines per game, exact labels, then evaluate gives finite numbers
+    tr, te, why = market_rows([[2025, 25.0, 30.0], [2026, 25.0, 27.0]], fake_p)  # L 21.5/25.5/28.5
+    check(why is None and tr.shape == (3, 2) and te.shape == (3, 2), (why, tr, te))
+    check(tr[:, 1].tolist() == [1.0, 1.0, 1.0] and te[:, 1].tolist() == [1.0, 1.0, 0.0],
+          (tr, te))
+    res, why = evaluate(tr, te)
+    check(why is None and all(np.isfinite(x) for x in res.values()), (res, why))
+    # empty market is still SKIPPED (not INVALID, not NaN)
+    tr, te, why = market_rows([], fake_p)
+    check(why is None, why)
+    res, why = evaluate(tr, te)
+    check(res is None and why.startswith("SKIPPED"), why)
     print(f"self-test: {n}/{n} ok")
 
 
@@ -139,20 +211,16 @@ def main(argv) -> int:
         raise SystemExit(f"SCRATCH_BIAS_MISSING: {bias_path}")
     ev, pr, cvs, grid = pricer.ev, pricer.pr, pricer.cvs, pricer.grid
 
-    def rows(a, m, cfg, season):
-        out = []
-        for _s, mu, y in a[a[:, 0] == season]:
-            for off in (-0.15, 0.0, 0.15):
-                L = np.floor(mu * (1 + off)) + 0.5
-                p = pr.p_over_for(ev, mu, cvs[m], cfg["count"], L, grid)
-                out.append((p, float(y > L)))
-        return as_rows(out)
-
     bias = json.loads(bias_path.read_text())
     for m, v in bias.items():
         cfg = ev.MARKETS[m]
-        a = np.asarray(v, dtype=float).reshape(-1, 3)
-        res, why = evaluate(rows(a, m, cfg, 2025), rows(a, m, cfg, 2026))
+
+        def p_fn(mu, L, m=m, cfg=cfg):
+            return pr.p_over_for(ev, mu, cvs[m], cfg["count"], L, grid)
+
+        tr, te, why = market_rows(v, p_fn)
+        if not why:
+            res, why = evaluate(tr, te)
         if why:
             print(f"{m:10} {why}")
             continue
