@@ -1,16 +1,48 @@
 {
  "assembly": "Priced per game by the pinned driver immediately after each game's own DK event-page read (QUOTE_STALE_180S envelope is per row and the driver's entry file is create-only per slate date), then assembled here from the unaltered per-game driver outputs; per-game reports verbatim under per_game.",
  "captures_file": "research/nfl_team_totals_forward_20261028/runs/capture_2026-11-01.json",
- "captures_sha256": "0dd8b16dd31b98329f733441f677c0d47893b56187c695a1c263f86f8a0c98ea",
+ "captures_sha256": "3ca9068d14047f1c5d56a5865de3e3e5029c0f770cd2858d8400c40fe17eeddd",
  "command": "price",
  "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
  "driver_module_file": "/home/hatch/workspace/nfltt-sunday-20261101/wt/sportsedge/nfl_team_total_driver.py",
  "driver_refusals": [],
- "games_built": 8,
+ "games_built": 11,
  "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
  "history_games": 7075,
  "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
  "lane_a_mode": "live",
+ "late_append": {
+  "base_commit": "957577126c1fa5160886c2ada4d96f156aa864c0",
+  "base_note": "Stacked on the noon slate branch (PR #2998 head): the noon files for this slate date are create-only in the driver's per-game out-dirs, so the late games were priced per game by the same pinned driver immediately after each game's own in-window DK read and appended unaltered, exactly as the noon assembly was built.",
+  "driver_module_file": "/home/hatch/workspace/nfltt-late-20261101/wt/sportsedge/nfl_team_total_driver.py",
+  "early_reads_unused": "First parallel reads for KC@DEN (server 14:08:48 CT) and NE@MIA (server 14:08:24 CT) landed 72s/96s before this job's stated 14:10-14:40 CT window and were NOT priced; fresh in-window re-reads govern (KC lines unchanged; NE lines unchanged). Early reads preserved in the operative dir as capture_34118271_EARLY_UNUSED.md / capture_34118184_EARLY_UNUSED.md.",
+  "games": [
+   {
+    "event_id": 34118097,
+    "game": "Los Angeles Chargers @ Los Angeles Rams",
+    "priced_at": "2026-11-01T19:54:41.919899+00:00",
+    "read_ct": "2026-11-01T13:53:16-06:00",
+    "records_written": 2
+   },
+   {
+    "event_id": 34118271,
+    "game": "Kansas City Chiefs @ Denver Broncos",
+    "priced_at": "2026-11-01T20:12:36.977871+00:00",
+    "read_ct": "2026-11-01T14:11:39-06:00",
+    "records_written": 2
+   },
+   {
+    "event_id": 34118184,
+    "game": "New England Patriots @ Miami Dolphins",
+    "priced_at": "2026-11-01T20:13:37.400671+00:00",
+    "read_ct": "2026-11-01T14:12:41-06:00",
+    "records_written": 2
+   }
+  ],
+  "games_file": "Same-day nflverse pull from the noon job (sha256 a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0; history snapshot sha256 aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717, identical to noon). A re-download attempt at 13:52 CT returned 'Not Found' from the guessed release URLs, so the verified same-day pull was reused rather than a substitute source.",
+  "job_id": "nfl-team-totals-runner-late-20261101",
+  "metrics_computed": false
+ },
  "metrics_computed": false,
  "notes": [],
  "per_game": [
@@ -28,6 +60,24 @@
    "notes": [],
    "priced_at": "2026-11-01T17:02:18.096986+00:00",
    "records_file": "/home/hatch/workspace/nfltt-sunday-20261101/out/34118052/entry_2026-11-01.jsonl",
+   "records_written": 2,
+   "runner_refusals": [],
+   "slate_date": "2026-11-01"
+  },
+  {
+   "captures_sha256": "7e97db35d9ce4d36fb32c266094942a1e66fb3551c9b28549ad433cd491db94d",
+   "command": "price",
+   "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+   "driver_refusals": [],
+   "games_built": 1,
+   "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
+   "history_games": 7075,
+   "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
+   "lane_a_mode": "live",
+   "metrics_computed": false,
+   "notes": [],
+   "priced_at": "2026-11-01T19:54:41.919899+00:00",
+   "records_file": "/home/hatch/workspace/nfltt-late-20261101/out/34118097/entry_2026-11-01.jsonl",
    "records_written": 2,
    "runner_refusals": [],
    "slate_date": "2026-11-01"
@@ -82,6 +132,24 @@
    "notes": [],
    "priced_at": "2026-11-01T16:57:52.197496+00:00",
    "records_file": "/home/hatch/workspace/nfltt-sunday-20261101/out/34118133/entry_2026-11-01.jsonl",
+   "records_written": 2,
+   "runner_refusals": [],
+   "slate_date": "2026-11-01"
+  },
+  {
+   "captures_sha256": "3c415104853aef7f5d509787e2c8e463caefbeebc369f3349c99a68f5f589843",
+   "command": "price",
+   "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+   "driver_refusals": [],
+   "games_built": 1,
+   "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
+   "history_games": 7075,
+   "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
+   "lane_a_mode": "live",
+   "metrics_computed": false,
+   "notes": [],
+   "priced_at": "2026-11-01T20:13:37.400671+00:00",
+   "records_file": "/home/hatch/workspace/nfltt-late-20261101/out/34118184/entry_2026-11-01.jsonl",
    "records_written": 2,
    "runner_refusals": [],
    "slate_date": "2026-11-01"
@@ -157,10 +225,28 @@
    "records_written": 2,
    "runner_refusals": [],
    "slate_date": "2026-11-01"
+  },
+  {
+   "captures_sha256": "faf30f01f0389389a9e4a6d668bc4358a69375d7accf53ae941296c3a882af91",
+   "command": "price",
+   "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+   "driver_refusals": [],
+   "games_built": 1,
+   "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
+   "history_games": 7075,
+   "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
+   "lane_a_mode": "live",
+   "metrics_computed": false,
+   "notes": [],
+   "priced_at": "2026-11-01T20:12:36.977871+00:00",
+   "records_file": "/home/hatch/workspace/nfltt-late-20261101/out/34118271/entry_2026-11-01.jsonl",
+   "records_written": 2,
+   "runner_refusals": [],
+   "slate_date": "2026-11-01"
   }
  ],
  "records_file": "research/nfl_team_totals_forward_20261028/runs/entry_2026-11-01.jsonl",
- "records_written": 16,
+ "records_written": 22,
  "runner_refusals": [],
  "slate_date": "2026-11-01",
  "worktree_head": "aedb5ff6f0b1ed2d09e5a136b62488848c74f1a1"
