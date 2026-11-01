@@ -192,8 +192,16 @@ def study(paired):
             continue
         try:
             fit = fit_residual(train)
-        except ValueError:
-            continue
+        except ValueError as exc:
+            # Only expected insufficient training / zero variance may skip a fold.
+            # Invalid or nonfinite source rows must never be relabeled as a
+            # mere coverage shortfall by silently dropping every later fold.
+            if str(exc) in (
+                "CFB_ML_CHRONO_TRAINING_INSUFFICIENT",
+                "CFB_ML_CHRONO_MODEL_VARIANCE_ZERO",
+            ):
+                continue
+            raise
         if fit["last_train_season"] >= year:
             raise ValueError("CFB_ML_CHRONO_LOOKAHEAD")
         row = grade(test, fit)
