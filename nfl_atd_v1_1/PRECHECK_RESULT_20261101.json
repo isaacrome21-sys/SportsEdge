@@ -1,0 +1,98 @@
+{
+  "record_type": "NFL_ATD_V1_1_PROSPECTIVE_PRECHECK_RESULT_V1",
+  "check_name": "SUNDAY_CHECK",
+  "scheduled_ct": "2026-11-01T09:30:00-06:00",
+  "audited_at_ct": "2026-11-01T09:30:49-06:00",
+  "audit_method": "Independent connected-GitHub readback; no rendered browser/controller receipt access; no source capture executed",
+  "disposition": "FAIL_CLOSED_ATD_AND_CBB_AUTHENTICATED_CAPTURE_NOT_ESTABLISHED",
+  "checks": {
+    "records_head_advanced": {
+      "result": "PASS",
+      "base_sha": "5ba400ef2c2b3b9c88bf4d33d81aa4eabc8383cc",
+      "observed_prewrite_head_sha": "4702cb835f55fc01a1a3b8eef273a3963cc55aa7",
+      "ahead_by": 2,
+      "behind_by": 0,
+      "files_added_since_base": [
+        "nfl_atd_v1_1/PRECHECK_SCHEDULE_20261026.json",
+        "nfl_atd_v1_1/PRECHECK_RESULT_20261029.json"
+      ]
+    },
+    "freeze_integrity": {
+      "result": "PASS",
+      "freeze_blob_sha": "09da4e852d5cc90369a1080ccef56f54a24a2243",
+      "pinned_code_commit": "c2fd86dcc995e34af2b315319d3a184f8b5178cf",
+      "frozen_v1_1_scorer_defect": "KeyError on missing week field remains; separate v1.2 drafts do not replace frozen v1.1"
+    },
+    "atd_sunday_precheck_source_receipt": {
+      "result": "FAIL_NOT_EVIDENCED",
+      "reason": "No independently authenticated Sunday precheck execution, paired DK market source quote, original source clock, raw SHA256, controller dispatch, ingestion, durable archive and delivery sequence in inspected ATD records; schedule PENDING_NOT_EXECUTED is not a receipt"
+    },
+    "atd_v12_parent_ci": {
+      "result": "ENGINEERING_CHECKS_ONLY_NOT_GOVERNANCE_CLEARED",
+      "pr": 2926,
+      "head_sha": "5866a1a7bffb25c08d6f0660e52d31edfef9ecbe",
+      "hosted_checks": "7/7 SUCCESS",
+      "required_ruleset_contexts": "Not present among 7 exact-head check-run names",
+      "exact_head_independent_rocky_clearance": "NOT_ESTABLISHED",
+      "draft": true
+    },
+    "atd_v12_child_ci": {
+      "result": "ENGINEERING_CHECKS_ONLY_NOT_GOVERNANCE_CLEARED",
+      "pr": 2927,
+      "head_sha": "cccd2a4ad322f5b6aba4fe948b37a3f1ae03b2da",
+      "hosted_checks": "7/7 SUCCESS",
+      "required_ruleset_contexts": "Not present among 7 exact-head check-run names",
+      "exact_head_independent_rocky_clearance": "NOT_ESTABLISHED",
+      "draft": true
+    },
+    "cbb_github_issue_landing": {
+      "result": "PASS_ISSUE_EXISTS_NOT_CAPTURE_ACCEPTANCE",
+      "issue_number": 2997,
+      "event_id": "34864865",
+      "fixture": "Villanova @ Notre Dame",
+      "operator_claimed_capture_ct": "2026-11-01T06:49:46-06:00",
+      "github_created_at_utc": "2026-11-01T13:12:32Z",
+      "claim_to_issue_creation_seconds": 1366,
+      "issue_contains": "Two-sided game spread, total, ML and team totals, additional alt/one-sided markets; depth incomplete"
+    },
+    "cbb_authenticated_capture": {
+      "result": "FAIL_NOT_EVIDENCED",
+      "reason": "Issue body has operator-asserted source time and prices but no independently authenticated original DK source byte hash, controller dispatch, ingestion, durable archive receipt, or verified window cutoff. GitHub issue creation alone is not a successful source-to-delivery capture. CBB construction HOLD"
+    },
+    "p0_delivery": {
+      "result": "OPEN_NOT_ACCEPTED",
+      "issue_number": 2792,
+      "reason": "No accepted prospective authenticated five-stage within-window receipt sequence or p50/p95/max evidence"
+    },
+    "oct25_exclusion": {
+      "result": "PASS_POLICY_PRESERVED",
+      "oct25_and_all_prior_slates": "PERMANENTLY_EXCLUDED_NO_RETROACTIVE_BACKFILL"
+    },
+    "prospective_counting": {
+      "result": "HOLD",
+      "new_counted_rows_authorized_by_this_audit": 0,
+      "units": 0
+    }
+  },
+  "governance": {
+    "no_merge_or_freeze_performed": true,
+    "no_counting": true,
+    "no_backfill": true,
+    "model_promotion": false,
+    "paper_only": true,
+    "nhl_paused_no_reads_writes_posts": true,
+    "cfb_score_only_closed_no_viable": true,
+    "nba_dist_v1_per_night_research_only": true
+  },
+  "next": "Obtain original authenticated DK/controller receipt chain for ATD and CBB; reconcile CBB #2997 22m46s operator-claim-to-issue-create gap with real dispatch/archive/window deadline; repair frozen v1.1 scorer only via prospective versioned v1.2 with both named required ruleset checks SUCCESS and independent/Rocky exact-head clearance, pinned asset and named first future counted slate; Nov 1 rehearsal NON_COUNTED",
+  "sources": [
+    "https://github.com/isaacrome21-sys/SportsEdge/tree/records/nfl-atd-v1-1/nfl_atd_v1_1",
+    "https://github.com/isaacrome21-sys/SportsEdge/blob/records/nfl-atd-v1-1/nfl_atd_v1_1/PRECHECK_RESULT_20261029.json",
+    "https://github.com/isaacrome21-sys/SportsEdge/blob/records/nfl-atd-v1-1/nfl_atd_v1_1/FREEZE.json",
+    "https://github.com/isaacrome21-sys/SportsEdge/issues/2997",
+    "https://github.com/isaacrome21-sys/SportsEdge/issues/2447#issuecomment-6558447597",
+    "https://github.com/isaacrome21-sys/SportsEdge/issues/2792",
+    "https://github.com/isaacrome21-sys/SportsEdge/pull/2926",
+    "https://github.com/isaacrome21-sys/SportsEdge/pull/2927"
+  ]
+}
