@@ -18,7 +18,12 @@ Guards (reviews 5726665611 and 5726872447 on #2979):
   rows) makes the market INVALID instead of being laundered into 0/1 labels or dropped;
 - (review 5727663452 on #2995) original raw cell types are checked BEFORE any float
   coercion: every cell must be a JSON number (int/float), never bool, str, null or nested;
-  JSON `true` or "30" makes the market INVALID instead of becoming 1.0 / 30.0.
+  JSON `true` or "30" makes the market INVALID instead of becoming 1.0 / 30.0;
+- (review 5727926064 on #2995) every raw cell must have |x| <= RAW_ABS_MAX (1e6), checked on
+  the original Python number before float coercion, so a JSON int like 10**400 or mu=1.7e308
+  makes the market INVALID instead of an uncaught OverflowError or an Inf line L; every
+  generated line L must be finite; every pricer output p_fn(mu, L) must itself be a real
+  int/float (not bool, str, None) before it is stored, else the market is INVALID.
 `python nfl_prop_oos.py --self-test` runs synthetic regressions without the pricer or data.
 """
 import importlib.util
@@ -60,6 +65,7 @@ def brier(r, s):
 
 
 SEASONS = (2025.0, 2026.0)
+RAW_ABS_MAX = 1e6  # no season, prop mean or prop outcome is anywhere near this
 
 
 def _raw_cell_ok(c):
@@ -79,6 +85,10 @@ def validate_raw(v):
         bad = [type(c).__name__ for c in row if not _raw_cell_ok(c)]
         if bad:
             return None, f"INVALID: raw row {i} has non-numeric cell type(s) {bad}"
+        # magnitude on the original number (exact Python int/float compare, never overflows);
+        # NaN and +/-Inf are left for the non-finite check below
+        if any(abs(c) > RAW_ABS_MAX and abs(c) != float("inf") for c in row):
+            return None, f"INVALID: raw row {i} has a cell beyond +/-{RAW_ABS_MAX:g}"
     if len(v) == 0:
         return np.empty((0, 3)), None
     a = np.asarray(v, dtype=float)
@@ -101,10 +111,23 @@ def market_rows(v, p_fn):
         for _s, mu, y in a[a[:, 0] == season]:
             for off in (-0.15, 0.0, 0.15):
                 L = np.floor(mu * (1 + off)) + 0.5
-                out.append((p_fn(mu, L), float(y > L)))
-        return as_rows(out)
+                if not np.isfinite(L):
+                    return None, f"INVALID: non-finite line L from mu={mu!r}"
+                p = p_fn(mu, L)
+                if isinstance(p, np.ndarray) and p.ndim == 0 and p.dtype.kind in "fiu":
+                    p = p.item()  # a 0-d numeric array from a vectorised pricer is a scalar
+                if not _raw_cell_ok(p):
+                    return None, f"INVALID: pricer returned {type(p).__name__}, not a number"
+                out.append((float(p), float(y > L)))
+        return as_rows(out), None
 
-    return season_rows(2025.0), season_rows(2026.0), None
+    tr, why = season_rows(2025.0)
+    if why:
+        return None, None, why
+    te, why = season_rows(2026.0)
+    if why:
+        return None, None, why
+    return tr, te, None
 
 
 def evaluate(tr, te):
@@ -216,6 +239,26 @@ def self_test():
     # integer JSON numbers (int season/actual) stay legal
     tr, te, why = market_rows(json.loads('[[2025, 25, 30], [2026, 25, 27]]'), fake_p)
     check(why is None and tr.shape == (3, 2), why)
+    # review 5727926064 repros (#2995): huge JSON ints / near-max floats are INVALID, not a
+    # crash or an Inf line, and pricer outputs are type-checked before coercion
+    big = json.loads('[[2025, 25.0, 30.0], [2026, 25.0, ' + '1' + '0' * 400 + ']]')
+    tr, te, why = market_rows(big, fake_p)
+    check(tr is None and why.startswith("INVALID: raw") and "beyond" in why, why)
+    for bad_rows in ([[2025, 1.7e308, 30.0]], [[2025, 25.0, -1e7]], [[10 ** 400, 25.0, 30.0]]):
+        tr, te, why = market_rows(bad_rows, fake_p)
+        check(tr is None and why.startswith("INVALID: raw"), (bad_rows, why))
+    ok = [[2025, 25.0, 30.0], [2026, 25.0, 27.0]]
+    for bad_p in (lambda mu, L: "0.5", lambda mu, L: True, lambda mu, L: None,  # noqa: E731
+                  lambda mu, L: np.bool_(False), lambda mu, L: [0.5]):  # noqa: E731
+        tr, te, why = market_rows(ok, bad_p)
+        check(tr is None and why.startswith("INVALID: pricer"), why)
+    # a numpy float pricer output stays legal
+    tr, te, why = market_rows(ok, lambda mu, L: np.float64(0.5))
+    check(why is None and tr.shape == (3, 2), why)
+    tr, te, why = market_rows(ok, lambda mu, L: np.array(0.5))
+    check(why is None and tr.shape == (3, 2), why)
+    tr, te, why = market_rows(ok, lambda mu, L: np.array("0.5"))
+    check(tr is None and why.startswith("INVALID: pricer"), why)
     # empty market is still SKIPPED (not INVALID, not NaN)
     tr, te, why = market_rows([], fake_p)
     check(why is None, why)
