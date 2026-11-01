@@ -1,0 +1,101 @@
+{
+  "capture_id": "20261101T185203Z-aedb5ff6f0b1",
+  "classification_sha256": "46cb81223cf4e2584aafaf6b54266f3ed8c3c3f81e3f92a125af902ef3b51911",
+  "eligibility_changed": false,
+  "files": [
+    {
+      "compression": "DETERMINISTIC_GZIP_MTIME0_V1",
+      "kind": "PREDICTIVE_PROJECTION",
+      "original_relative_path": "source/play_by_play/2026/predictive/play_by_play_market_blind.csv",
+      "source_sha256": "fe16bbd0874ce20bff18cc039e65acf6ceac8b4192490c8e71e76f34a4f1ec4f",
+      "stored_relative_path": "source/play_by_play/2026/predictive/play_by_play_market_blind.csv.gz",
+      "stored_sha256": "e262de707836b098a68f3d67ba73dc86ff5bc98fcbfde35c673db01166318c79",
+      "stored_size_bytes": 1405640
+    },
+    {
+      "compression": "DETERMINISTIC_GZIP_MTIME0_V1",
+      "kind": "RAW_SOURCE",
+      "original_relative_path": "source/game_rosters/2026/game_rosters_2026.csv",
+      "source_sha256": "5c1a8ba98c993b6e31621650c2e6684385f14e6098f7393e3dcf58c3e49fdae2",
+      "stored_relative_path": "source/game_rosters/2026/game_rosters_2026.csv.gz",
+      "stored_sha256": "7dcc2ae057a0d55656b2cb6cfa8aef85fa9c31dd8b834b3c71bec685c88327d8",
+      "stored_size_bytes": 14783576
+    },
+    {
+      "compression": "DETERMINISTIC_GZIP_MTIME0_V1",
+      "kind": "RAW_SOURCE",
+      "original_relative_path": "source/play_by_play/2026/play_by_play_2026.csv",
+      "source_sha256": "2e5b6e92636b5a8f2cb64ef68326ca558a92d420fbe52c710c3dd3df1f14641a",
+      "stored_relative_path": "source/play_by_play/2026/play_by_play_2026.csv.gz",
+      "stored_sha256": "fb4b04eed674d38673f33837e0f7ed3d795f55d3a074aa1b1a963a62b317ca6c",
+      "stored_size_bytes": 55267092
+    },
+    {
+      "compression": "DETERMINISTIC_GZIP_MTIME0_V1",
+      "kind": "RAW_SOURCE",
+      "original_relative_path": "source/play_participants/2026/play_participants_2026.csv",
+      "source_sha256": "e36fe0f056278e7327a2c54220374870b434a8d0c6e0bb52c62aab75b7c5fccd",
+      "stored_relative_path": "source/play_participants/2026/play_participants_2026.csv.gz",
+      "stored_sha256": "6bc6626f524b3ffcd55e50e39767b6123a0310c8f6f46307bde1d77c85b056bd",
+      "stored_size_bytes": 3442184
+    },
+    {
+      "compression": "DETERMINISTIC_GZIP_MTIME0_V1",
+      "kind": "RAW_SOURCE",
+      "original_relative_path": "source/player_box/2026/player_box_2026.csv",
+      "source_sha256": "4b0056daf3bea82f3cddd33a250be70fe38a5ac495520c2eaba09f2be8c32c5d",
+      "stored_relative_path": "source/player_box/2026/player_box_2026.csv.gz",
+      "stored_sha256": "815d2a3baaf3ded31eca0c7c38b824cb648bfc7eaa85d5f1d866e28ac063f022",
+      "stored_size_bytes": 1095961
+    },
+    {
+      "compression": "IDENTITY",
+      "dataset": "game_rosters",
+      "kind": "SOURCE_MANIFEST",
+      "original_relative_path": "source/game_rosters/2026/manifest.json",
+      "source_sha256": "2f4f6658fd5122b781f438b2097f7e15e3338ca3930833fba4ba0dbda908feaf",
+      "stored_relative_path": "provenance/game_rosters/2026/manifest.json",
+      "stored_sha256": "2f4f6658fd5122b781f438b2097f7e15e3338ca3930833fba4ba0dbda908feaf",
+      "stored_size_bytes": 1277
+    },
+    {
+      "compression": "IDENTITY",
+      "dataset": "play_by_play",
+      "kind": "SOURCE_MANIFEST",
+      "original_relative_path": "source/play_by_play/2026/manifest.json",
+      "source_sha256": "21eeb95e1b0db6574eb9ddd8ab82c56f83a28217198d21f5facc687b1424ddba",
+      "stored_relative_path": "provenance/play_by_play/2026/manifest.json",
+      "stored_sha256": "21eeb95e1b0db6574eb9ddd8ab82c56f83a28217198d21f5facc687b1424ddba",
+      "stored_size_bytes": 2824
+    },
+    {
+      "compression": "IDENTITY",
+      "dataset": "play_participants",
+      "kind": "SOURCE_MANIFEST",
+      "original_relative_path": "source/play_participants/2026/manifest.json",
+      "source_sha256": "6f9bc8c4049a6d252921dc41bebcd61ada2fcc918701a7be1fe0efe92c1739a1",
+      "stored_relative_path": "provenance/play_participants/2026/manifest.json",
+      "stored_sha256": "6f9bc8c4049a6d252921dc41bebcd61ada2fcc918701a7be1fe0efe92c1739a1",
+      "stored_size_bytes": 1311
+    },
+    {
+      "compression": "IDENTITY",
+      "dataset": "player_box",
+      "kind": "SOURCE_MANIFEST",
+      "original_relative_path": "source/player_box/2026/manifest.json",
+      "source_sha256": "66fb820558181a99fd4c343e36f575dc1697ae005d149d211b3cc37d062a2d5c",
+      "stored_relative_path": "provenance/player_box/2026/manifest.json",
+      "stored_sha256": "66fb820558181a99fd4c343e36f575dc1697ae005d149d211b3cc37d062a2d5c",
+      "stored_size_bytes": 1260
+    }
+  ],
+  "manifest_sha256": "db060879c6acd375dc503bc5ca5133e084f5aa100bfd583ecc8b701fd085248d",
+  "max_stored_bytes": 99614720,
+  "model_fit_performed": false,
+  "model_p_created": false,
+  "promotion_authority": false,
+  "retroactive_point_in_time_claim": false,
+  "schema_version": "CFB_FORWARD_PARTICIPATION_PERSISTENCE_V1",
+  "sport": "CFB",
+  "storage_rule": "Plain captured CSVs are wrapped in deterministic gzip (mtime=0); already-gzipped upstream assets are stored byte-identically. source_sha256 always names the exact pre-wrapper captured bytes."
+}
