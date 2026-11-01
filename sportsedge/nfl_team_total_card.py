@@ -2,14 +2,14 @@
 
 The frozen runner (freeze PR #2860) picks by |mu - line| >= 2.0 and that
 rule is preregistered, so it is NOT changed here; forward evidence rows stay
-exactly as priced. This module only decides which picked rows are shown as
-plays on this research card. It is not the canonical RUN IT card and does
+exactly as priced. This module only decides which picked rows are listed as
+research picks on this card. It is not the canonical RUN IT card and does
 not replace the shared Lane A card.json pipeline. It does not authenticate
 quotes: authentication is upstream (the runner prices only rows from a
 DraftKings capture file). This card only refuses rows that do not carry the
 runner's provenance fields or whose quote was stale when priced.
 
-A picked row is a PLAY only if:
+A picked row is a RESEARCH_PICK only if:
   0. the record, entry, ev and lane_a containers are dicts, and EV, mu,
      Lane A mean, line and price are finite real numbers
      (NaN/inf/huge/bool/missing/wrong type -> PASS with BAD_INPUT_<field>), and
@@ -27,8 +27,16 @@ A picked row is a PLAY only if:
   5. the engine mean is within MAX_LANE_A_DIVERGENCE points of the
      independent Lane A team mean (a larger split means a suspect input), and
   6. EV on the picked side is <= MAX_PLAUSIBLE_EV (larger edges on an NFL
-     team total are treated as an input error until reviewed).
-Anything else is PASS with a reason code. Plays are ranked by EV, high to low.
+     team total are treated as an input error until reviewed), and
+  7. the row has a non-empty string row_id and team, the line is in
+     (0, MAX_TEAM_TOTAL] and both means are in [0, MAX_TEAM_TOTAL]
+     (MISSING_IDENTITY / BAD_DOMAIN_<field>), and
+  8. it is the first row with that row_id + side (later copies are PASS with
+     DUPLICATE_ROW).
+Rows meeting every rule get status RESEARCH_PICK with bettable=False. This
+module never emits PLAY: it holds no authenticated DraftKings source receipt,
+so its output is a research list, not a bet card. Anything else is PASS with
+a reason code. Research picks are ranked by EV, high to low.
 """
 from __future__ import annotations
 
@@ -40,6 +48,8 @@ MIN_EV = 0.03
 PRICE_CAP = -165
 MAX_LANE_A_DIVERGENCE = 5.0
 MAX_PLAUSIBLE_EV = 0.35
+MAX_TEAM_TOTAL = 70.0
+RESEARCH_PICK = "RESEARCH_PICK"  # never "PLAY": no authenticated source receipt here
 MAX_QUOTE_AGE_S = 1800  # owner ruling 2026-10-25: card quote-age limit 30 min
 
 SCHEMA = "NFL_TEAM_TOTAL_FORWARD_ROW_V1"
@@ -81,7 +91,8 @@ def classify(record) -> dict:
     entry = _dict(record.get("entry"))
     out = {"row_id": record.get("row_id"), "team": record.get("team"),
            "side": side, "line": entry.get("line"),
-           "price": None, "ev": None, "status": "PASS", "reasons": []}
+           "price": None, "ev": None, "status": "PASS", "bettable": False,
+           "reasons": []}
     if side is None:
         out["reasons"].append("NOT_PICKED")
         return out
@@ -95,6 +106,15 @@ def classify(record) -> dict:
     for name, val in (("EV", ev), ("MU", mu), ("LINE", line), ("PRICE", price)):
         if val is None:
             out["reasons"].append("BAD_INPUT_" + name)
+    for name, val in (("row_id", record.get("row_id")), ("team", record.get("team"))):
+        if not (isinstance(val, str) and val.strip()):
+            out["reasons"].append("MISSING_IDENTITY")
+            break
+    if line is not None and not (0 < line <= MAX_TEAM_TOTAL):
+        out["reasons"].append("BAD_DOMAIN_LINE")
+    for name, val in (("MU", mu), ("LANE_A", lane_a)):
+        if val is not None and not (0 <= val <= MAX_TEAM_TOTAL):
+            out["reasons"].append("BAD_DOMAIN_" + name)
     if price is not None:
         if -100 < price < 100:
             out["reasons"].append("BAD_INPUT_PRICE")
@@ -134,14 +154,22 @@ def classify(record) -> dict:
         if ev > MAX_PLAUSIBLE_EV:
             out["reasons"].append("EV_IMPLAUSIBLE")
     if not out["reasons"]:
-        out["status"] = "PLAY"
+        out["status"] = RESEARCH_PICK
     return out
 
 
 def build_card(records: Iterable[dict]) -> list[dict]:
     rows = [classify(r) for r in records]
     picked = [r for r in rows if r["side"] is not None]
-    return sorted(picked, key=lambda r: (r["status"] != "PLAY",
+    seen = set()
+    for r in picked:
+        key = (r["row_id"], r["side"]) if isinstance(r["row_id"], str) else None
+        if key is not None and key in seen:
+            r["status"] = "PASS"
+            r["reasons"].append("DUPLICATE_ROW")
+        elif key is not None:
+            seen.add(key)
+    return sorted(picked, key=lambda r: (r["status"] != RESEARCH_PICK,
                                          -(r["ev"] if r["ev"] is not None else 0.0)))
 
 

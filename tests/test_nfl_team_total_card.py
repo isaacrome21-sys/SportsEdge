@@ -1,6 +1,8 @@
 import unittest
 
-from sportsedge.nfl_team_total_card import build_card, classify
+from sportsedge.nfl_team_total_card import RESEARCH_PICK, build_card, classify
+
+PLAY = RESEARCH_PICK
 
 CAP = "2026-11-01T10:57:06-06:00"
 PRICED = "2026-11-01T10:58:00-06:00"
@@ -30,9 +32,9 @@ class CardTests(unittest.TestCase):
         self.assertIn("LANE_A_DIVERGENCE", r["reasons"])
         self.assertIn("EV_IMPLAUSIBLE", r["reasons"])
 
-    def test_clean_pick_is_play(self):  # NYJ 2026-11-01
+    def test_clean_pick_is_research_pick(self):  # NYJ 2026-11-01
         r = classify(rec("NYJ", "PICKED_UNDER", -0.33, 0.213, 21.37, 21.15))
-        self.assertEqual(r["status"], "PLAY", r["reasons"])
+        self.assertEqual(r["status"], PLAY, r["reasons"])
 
     def test_passed_rows_excluded_and_ranked_by_ev(self):
         card = build_card([
@@ -73,13 +75,13 @@ class CardTests(unittest.TestCase):
         r = classify(rec("X", "PICKED_OVER", 0.01, 0.0, 20, 20))
         self.assertEqual(r["status"], "PASS")
         self.assertIn("EV_BELOW_FLOOR", r["reasons"])
-        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.03, 0.0, 20, 20))["status"], "PLAY")
+        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.03, 0.0, 20, 20))["status"], PLAY)
 
     def test_price_beyond_cap_is_pass(self):
         r = classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, price=-500))
         self.assertEqual(r["status"], "PASS")
         self.assertIn("PRICE_BEYOND_CAP", r["reasons"])
-        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, price=-165))["status"], "PLAY")
+        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, price=-165))["status"], PLAY)
 
     def test_missing_or_bad_capture_time_is_pass(self):
         for cap, ko, code in ((None, KO, "CAPTURED_AT_MISSING"),
@@ -112,7 +114,7 @@ class CardTests(unittest.TestCase):
     def test_quote_age_limit_is_30_minutes(self):
         ok = classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20,
                           captured="2026-11-01T10:28:00-06:00"))
-        self.assertEqual(ok["status"], "PLAY", ok["reasons"])
+        self.assertEqual(ok["status"], PLAY, ok["reasons"])
         old = classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20,
                            captured="2026-11-01T10:27:59-06:00"))
         self.assertIn("QUOTE_STALE", old["reasons"])
@@ -136,6 +138,43 @@ class CardTests(unittest.TestCase):
         r2 = rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20)
         r2["label"] = "RETROSPECTIVE"
         self.assertIn("PROVENANCE_MISSING", classify(r2)["reasons"])
+
+    # ChatGPT review 5730642002 probes
+    def test_impossible_team_totals_are_pass(self):
+        for kw, code in ((dict(line=-3.5, mu=-4, lane_a=-4), "BAD_DOMAIN_LINE"),
+                         (dict(line=0, mu=20, lane_a=20), "BAD_DOMAIN_LINE"),
+                         (dict(line=24.5, mu=-1, lane_a=-1), "BAD_DOMAIN_MU"),
+                         (dict(line=24.5, mu=20, lane_a=-1), "BAD_DOMAIN_LANE_A"),
+                         (dict(line=500.5, mu=500, lane_a=500), "BAD_DOMAIN_LINE")):
+            args = dict(team="X", pick="PICKED_OVER", ev_over=0.1, ev_under=0.0)
+            args.update(kw)
+            r = classify(rec(**args))
+            self.assertEqual(r["status"], "PASS", kw)
+            self.assertIn(code, r["reasons"], kw)
+
+    def test_missing_identity_is_pass(self):
+        for drop in (("row_id",), ("team",), ("row_id", "team")):
+            r2 = rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20)
+            for k in drop:
+                del r2[k]
+            r = classify(r2)
+            self.assertEqual(r["status"], "PASS", drop)
+            self.assertIn("MISSING_IDENTITY", r["reasons"])
+        r2 = rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20)
+        r2["team"] = "  "
+        self.assertIn("MISSING_IDENTITY", classify(r2)["reasons"])
+
+    def test_duplicate_row_is_pass(self):
+        row = rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20)
+        card = build_card([row, dict(row)])
+        self.assertEqual([r["status"] for r in card], [PLAY, "PASS"])
+        self.assertIn("DUPLICATE_ROW", card[1]["reasons"])
+
+    def test_never_emits_play_or_bettable(self):
+        r = classify(rec("NYJ", "PICKED_UNDER", -0.33, 0.213, 21.37, 21.15))
+        self.assertEqual(r["status"], "RESEARCH_PICK")
+        self.assertFalse(r["bettable"])
+        self.assertNotEqual(r["status"], "PLAY")
 
 
 if __name__ == "__main__":
