@@ -1,0 +1,47 @@
+{
+ "asof": "2026-11-01T20:06:20.108500+00:00",
+ "bets": [
+  {
+   "fixture_id": "id1100064873658208",
+   "start": "2026-11-02T05:00:00.000Z",
+   "tournament": "NCAA, Regular Season basketball",
+   "game": "High Point Panthers @ Liberty Flames",
+   "market_id": "111576",
+   "market": "Over Under Team 2 (incl. overtime) 79.5",
+   "player": "",
+   "line": "",
+   "side": "111577",
+   "bet": "High Point Panthers Under 79.5",
+   "dk_decimal": 2.24,
+   "dk_american": 124,
+   "dk_changed_at": "2026-11-01T19:26:17.934000+00:00",
+   "pinnacle_changed_at": "2026-11-01T19:09:51.838000+00:00",
+   "pinnacle_fair_p": 0.469,
+   "ev": 0.0505
+  },
+  {
+   "fixture_id": "id1100013273719482",
+   "start": "2026-11-02T02:00:00.000Z",
+   "tournament": "NBA",
+   "game": "Toronto Raptors @ Los Angeles Lakers",
+   "market_id": "11726",
+   "market": "Over Under Second Quarter 54.5",
+   "player": "",
+   "line": "",
+   "side": "11726",
+   "bet": "Over 54.5",
+   "dk_decimal": 2.33,
+   "dk_american": 133,
+   "dk_changed_at": "2026-11-01T19:55:45.653000+00:00",
+   "pinnacle_changed_at": "2026-11-01T19:17:32.130000+00:00",
+   "pinnacle_fair_p": 0.4459,
+   "ev": 0.0389
+  }
+ ],
+ "n_compared": 754,
+ "notes": [
+  "tournaments: NBA, NCAA Women, Regular Season basketball, NCAA, Regular Season basketball, NCAA, Regular Season football, NFL",
+  "OddsPapi calls today 17/20",
+  "fixtures DK 173 / Pinnacle 12"
+ ]
+}
