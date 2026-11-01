@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from math import isfinite
 from pathlib import Path
 
 FAMILY = "PRIOR_CURRENT_BLEND"
@@ -27,8 +28,20 @@ FIRST_TEST = 2021
 BREAKEVEN = 110 / 210
 
 
+def _finite_number(value):
+    """Research inputs must be actual finite numbers, never bool or text."""
+    return (not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and isfinite(value))
+
+
 def fit_residual(data):
     """OLS residual on model_margin vs realized margin; used only for research screening."""
+    # Integrity precedes coverage: a short sample must not hide a corrupt
+    # source row behind INSUFFICIENT_CHRONO_TRAINING.
+    if any(not _finite_number(r.get("model_margin"))
+           or not _finite_number(r.get("actual_margin")) for r in data):
+        raise ValueError("CFB_ML_CHRONO_TRAINING_NONFINITE_OR_NONNUMERIC")
     if len(data) < 300 or len({x["season"] for x in data}) < 3:
         raise ValueError("CFB_ML_CHRONO_TRAINING_INSUFFICIENT")
     xs = [r["model_margin"] for r in data]
@@ -40,6 +53,8 @@ def fit_residual(data):
         raise ValueError("CFB_ML_CHRONO_MODEL_VARIANCE_ZERO")
     weight = sum((x - a) * (y - b) for x, y in zip(xs, ys)) / xx
     offset = b - weight * a
+    if not (isfinite(weight) and isfinite(offset)):
+        raise ValueError("CFB_ML_CHRONO_FIT_NONFINITE")
     return {
         "intercept": offset,
         "weight": weight,
@@ -131,10 +146,19 @@ def paired_moneylines(preds, cache):
 
 def grade(rows, fit, threshold=THRESHOLD):
     """Side selection on calibrated model margin; research-only grading."""
+    if (not _finite_number(threshold) or threshold <= 0
+            or not _finite_number(fit.get("intercept"))
+            or not _finite_number(fit.get("weight"))):
+        raise ValueError("CFB_ML_CHRONO_GRADE_INVALID_FIT")
+    if any(not _finite_number(r.get("model_margin"))
+           or type(r.get("home_won")) is not bool for r in rows):
+        raise ValueError("CFB_ML_CHRONO_GRADE_INVALID_HOLDOUT")
     wins = losses = pushes = 0
     direction = {"home": 0, "away": 0}
     for r in rows:
         signed = fit["intercept"] + fit["weight"] * r["model_margin"]
+        if not isfinite(signed):
+            raise ValueError("CFB_ML_CHRONO_GRADE_NONFINITE_SCORE")
         if abs(signed) < threshold:
             continue
         side_home = signed > 0
@@ -168,8 +192,16 @@ def study(paired):
             continue
         try:
             fit = fit_residual(train)
-        except ValueError:
-            continue
+        except ValueError as exc:
+            # Only expected insufficient training / zero variance may skip a fold.
+            # Invalid or nonfinite source rows must never be relabeled as a
+            # mere coverage shortfall by silently dropping every later fold.
+            if str(exc) in (
+                "CFB_ML_CHRONO_TRAINING_INSUFFICIENT",
+                "CFB_ML_CHRONO_MODEL_VARIANCE_ZERO",
+            ):
+                continue
+            raise
         if fit["last_train_season"] >= year:
             raise ValueError("CFB_ML_CHRONO_LOOKAHEAD")
         row = grade(test, fit)

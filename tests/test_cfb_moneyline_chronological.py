@@ -130,5 +130,71 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
         self.assertFalse(report["authority"]["bets"])
 
 
+    def test_nonfinite_training_row_cannot_turn_fit_into_nan(self):
+        # Three historical seasons, 300 rows: one NaN previously poisoned
+        # the OLS coefficients and generated an all-AWAY synthetic card.
+        train = [r for y in (2018, 2019, 2020) for r in rows(y, 100)]
+        good = fit_residual(train)
+        self.assertTrue(__import__("math").isfinite(good["weight"]))
+        for field in ("model_margin", "actual_margin"):
+            for bad in (float("nan"), float("inf"), -float("inf"), "bad"):
+                damaged = [dict(x) for x in train]
+                damaged[0][field] = bad
+                with self.subTest(field=field, bad=str(bad)):
+                    with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+                        fit_residual(damaged)
+
+    def test_nonfinite_fit_and_holdout_refused_before_any_side_selection(self):
+        valid = [
+            {"model_margin": 4.0, "home_won": True},
+            {"model_margin": -5.0, "home_won": False},
+        ]
+        self.assertEqual(grade(valid, {"intercept": 0.0, "weight": 1.0})["decisions"], 2)
+        for bad in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(fit=str(bad)):
+                with self.assertRaisesRegex(ValueError, "GRADE_INVALID_FIT"):
+                    grade(valid, {"intercept": bad, "weight": 1.0})
+            with self.subTest(holdout=str(bad)):
+                with self.assertRaisesRegex(ValueError, "GRADE_INVALID_HOLDOUT"):
+                    grade(valid + [{"model_margin": bad, "home_won": True}],
+                          {"intercept": 0.0, "weight": 1.0})
+        with self.assertRaisesRegex(ValueError, "GRADE_INVALID_HOLDOUT"):
+            grade([{"model_margin": 4.0, "home_won": 1}],
+                  {"intercept": 0.0, "weight": 1.0})
+
+
+    def test_study_does_not_mislabel_corrupt_history_as_insufficient_training(self):
+        # Each 2021-2025 fold uses 2017 as training; one nonfinite row must
+        # invalidate the study rather than silently drop all five folds.
+        data = [x for year in range(2017, 2026) for x in rows(year)]
+        clean = study(data)
+        self.assertEqual(len(clean["folds"]), 5)
+        damaged = [dict(x) for x in data]
+        damaged[0]["model_margin"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            study(damaged)
+
+    def test_corrupt_short_training_is_integrity_failure_not_coverage(self):
+        # 297 rows across three seasons: a nonfinite row must be refused
+        # before the legitimate <300-row coverage gate is evaluated.
+        train = [r for year in (2017, 2018, 2019) for r in rows(year, 99)]
+        with self.assertRaisesRegex(ValueError, "TRAINING_INSUFFICIENT"):
+            fit_residual(train)
+        damaged = [dict(r) for r in train]
+        damaged[0]["model_margin"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            fit_residual(damaged)
+        # The chronological wrapper must not turn the same invalid data
+        # into BLOCKED_INSUFFICIENT_CHRONO_TRAINING either.
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            study(damaged + rows(2021, 10))
+
+
+    def test_study_keeps_legitimate_insufficient_training_blocked(self):
+        report = study(rows(2025, 10))
+        self.assertEqual(report["status"], "BLOCKED_INSUFFICIENT_CHRONO_TRAINING")
+        self.assertEqual(report["folds"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
