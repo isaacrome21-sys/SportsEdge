@@ -1,0 +1,58 @@
+name: daily-board
+on:
+  push:
+    branches: [claude/daily-board-feed]
+    paths: ['simple/board.py', '.github/workflows/daily-board.yml']
+  schedule:
+    - cron: '37 14 * * *'
+    - cron: '37 17 * * *'
+    - cron: '37 22 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: daily-board-oddspapi
+  cancel-in-progress: false
+jobs:
+  board:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: claude/daily-board-data
+          path: data
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Offline self-test (no calls)
+        run: python simple/board.py selftest
+      - name: Build board
+        id: build
+        env:
+          SPORTSEDGE_ODDSPAPI_KEY: ${{ secrets.SPORTSEDGE_ODDSPAPI_KEY }}
+        run: |
+          mkdir -p data/board
+          set +e
+          python simple/board.py run data/board 2>&1 | tee board_out.txt
+          result=${PIPESTATUS[0]}
+          cat board_out.txt >> "$GITHUB_STEP_SUMMARY"
+          exit "$result"
+      - name: Save board and raw odds to claude/daily-board-data
+        if: always() && steps.build.outcome != 'skipped'
+        working-directory: data
+        run: |
+          cp ../board_out.txt board/last_run_output.txt || true
+          git config user.name "sportsedge-board"
+          git config user.email "sportsedge-board@users.noreply.github.com"
+          git add -A board
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "board: $(date -u +%FT%H%MZ) run ${GITHUB_RUN_ID}"
+          git push origin HEAD:claude/daily-board-data
+      # Publication awaits independent validation of provider market mapping.
+      - name: Preserve diagnostic output
+        if: always()
+        run: |
+          echo "Raw capture only: publication pending provider mapping review." >> "$GITHUB_STEP_SUMMARY"
