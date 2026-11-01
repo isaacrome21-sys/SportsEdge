@@ -2,11 +2,16 @@ import unittest
 
 from sportsedge.nfl_team_total_card import build_card, classify
 
+CAP = "2026-11-01T10:57:06-06:00"
+KO = "2026-11-01T12:00:00-06:00"
 
-def rec(team, pick, ev_over, ev_under, mu, lane_a, line=24.5, price=-110):
+
+def rec(team, pick, ev_over, ev_under, mu, lane_a, line=24.5, price=-110,
+        captured=CAP, kickoff=KO):
     return {"row_id": f"G:{team}", "team": team, "pick": pick, "mu": mu,
-            "lane_a": {"team_mean": lane_a},
-            "entry": {"line": line, "over_price": price, "under_price": price},
+            "kickoff": kickoff, "lane_a": {"team_mean": lane_a},
+            "entry": {"line": line, "over_price": price, "under_price": price,
+                      "over_captured_at": captured, "under_captured_at": captured},
             "ev": {"OVER": ev_over, "UNDER": ev_under}}
 
 
@@ -56,6 +61,40 @@ class CardTests(unittest.TestCase):
     def test_missing_entry_is_pass_not_crash(self):
         r = classify({"pick": "PICKED_OVER", "ev": {"OVER": 0.1}, "mu": 20, "lane_a": {"team_mean": 20}})
         self.assertEqual(r["status"], "PASS")
+
+    # ChatGPT review 5729970600 probes
+    def test_ev_below_floor_is_pass(self):
+        r = classify(rec("X", "PICKED_OVER", 0.01, 0.0, 20, 20))
+        self.assertEqual(r["status"], "PASS")
+        self.assertIn("EV_BELOW_FLOOR", r["reasons"])
+        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.03, 0.0, 20, 20))["status"], "PLAY")
+
+    def test_price_beyond_cap_is_pass(self):
+        r = classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, price=-500))
+        self.assertEqual(r["status"], "PASS")
+        self.assertIn("PRICE_BEYOND_CAP", r["reasons"])
+        self.assertEqual(classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, price=-165))["status"], "PLAY")
+
+    def test_missing_or_bad_capture_time_is_pass(self):
+        for cap, ko, code in ((None, KO, "CAPTURED_AT_MISSING"),
+                              ("garbage", KO, "CAPTURED_AT_MISSING"),
+                              ("2026-11-01T10:57:06", KO, "CAPTURED_AT_MISSING"),
+                              (CAP, None, "KICKOFF_MISSING"),
+                              ("2026-11-01T12:05:00-06:00", KO, "CAPTURED_AFTER_KICKOFF")):
+            r = classify(rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20, captured=cap, kickoff=ko))
+            self.assertEqual(r["status"], "PASS", code)
+            self.assertIn(code, r["reasons"])
+
+    def test_malformed_containers_fail_closed(self):
+        base = rec("X", "PICKED_OVER", 0.1, 0.0, 20, 20)
+        for field, val in (("ev", [0.1]), ("lane_a", [20]), ("entry", [1]),
+                           ("ev", "x"), ("lane_a", 5), ("pick", ["PICKED_OVER"])):
+            r2 = dict(base)
+            r2[field] = val
+            r = classify(r2)
+            self.assertEqual(r["status"], "PASS", field)
+        for bad in (None, [], "x", 3):
+            self.assertEqual(classify(bad)["status"], "PASS")
 
 
 if __name__ == "__main__":
