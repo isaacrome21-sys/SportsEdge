@@ -1,0 +1,1 @@
+REFUSED: HTTP_429_/tournaments
