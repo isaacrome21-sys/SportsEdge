@@ -7,11 +7,14 @@ The whole method fits on one page:
 3. **Bet only the gaps.** Bet where our view and the book disagree by a set number of points.
 4. **One test.** Pick settings on old seasons, then freeze them and run once on newer seasons. Win rate and ROI at the real price. That's it.
 
-Files: `odds.py` (price math), `ratings.py` (the rating solver), `backtest_nfl.py` (NFL test).
+Files: `odds.py` (price math), `ratings.py` (the rating solver), `backtest_nfl.py` (NFL test), `backtest_cbb_sbr.py` (CBB close + opener test on the SBR archive), `props_nfl.py` (NFL props pricer).
 
-## Result so far
-NFL sides, frozen test on 2020–2026: 694 bets, 51.0% ATS, −1.9% ROI. **No edge**: NFL closing lines are already sharp.
-Next: run the same engine on college basketball (CBB), where books have to price 360+ teams.
+## Results so far (all research, none verified)
+- **NFL sides**, frozen test on 2020–2026: 694 bets, 51.0% ATS, −1.9% ROI. **No edge**: NFL closing lines are already sharp.
+- **CBB sides, bet the close** (SBR archive, not DK, all graded at −110), settings picked on 2016–18, frozen, tested once on 2019–20: 3,317 bets, 49.3% ATS, −5.7% ROI. **No edge.**
+- **CBB early-line / CLV, bet the opener** (same data and split): 7,999 bets, average CLV +0.25 pts, 52.2% ATS at the opener, −0.4% ROI. Small real line movement our way, not enough to beat −110. Full output: `results/cbb_sbr_2016_2020.txt`.
+
+Next: NFL props (design #2916) once a shared DK props capture is pushed where this lane can read it. A follow-up CBB check is the opener signal at real DK opening prices, which needs forward DK CBB opens.
 
 ## Paper-bet ledger (every model, every market, every agent)
 `simple/ledger.csv` is the one shared log. `python simple/ledger.py add ...` before the game, `grade ...` after, `summary` for ROI + CLV per model/market.
