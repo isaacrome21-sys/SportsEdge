@@ -174,6 +174,22 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
             study(damaged)
 
+    def test_corrupt_short_training_is_integrity_failure_not_coverage(self):
+        # 297 rows across three seasons: a nonfinite row must be refused
+        # before the legitimate <300-row coverage gate is evaluated.
+        train = [r for year in (2017, 2018, 2019) for r in rows(year, 99)]
+        with self.assertRaisesRegex(ValueError, "TRAINING_INSUFFICIENT"):
+            fit_residual(train)
+        damaged = [dict(r) for r in train]
+        damaged[0]["model_margin"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            fit_residual(damaged)
+        # The chronological wrapper must not turn the same invalid data
+        # into BLOCKED_INSUFFICIENT_CHRONO_TRAINING either.
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            study(damaged + rows(2021, 10))
+
+
     def test_study_keeps_legitimate_insufficient_training_blocked(self):
         report = study(rows(2025, 10))
         self.assertEqual(report["status"], "BLOCKED_INSUFFICIENT_CHRONO_TRAINING")
