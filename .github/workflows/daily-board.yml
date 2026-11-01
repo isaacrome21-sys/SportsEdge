@@ -3,10 +3,6 @@ on:
   push:
     branches: [claude/daily-board-feed]
     paths: ['simple/board.py', '.github/workflows/daily-board.yml']
-  schedule:
-    - cron: '37 14 * * *'
-    - cron: '37 17 * * *'
-    - cron: '37 22 * * *'
   workflow_dispatch:
 permissions:
   contents: write
