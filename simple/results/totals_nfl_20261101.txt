@@ -1,0 +1,37 @@
+Run 2026-11-01 ~12:45 CT, Claude. Data: nflverse schedules games.csv (release asset), REG season, consensus closing totals + prices.
+
+TRAIN grid (2010-2019):
+  hl= 4 ridge= 2.0 thr=2.0  MAE own=10.96 mkt=10.56  n=1395 win=0.488 roi=-0.046
+  hl= 4 ridge= 2.0 thr=3.0  MAE own=10.96 mkt=10.56  n= 923 win=0.488 roi=-0.046
+  hl= 4 ridge= 2.0 thr=4.0  MAE own=10.96 mkt=10.56  n= 559 win=0.496 roi=-0.030
+  hl= 4 ridge= 8.0 thr=2.0  MAE own=10.82 mkt=10.56  n=1175 win=0.489 roi=-0.044
+  hl= 4 ridge= 8.0 thr=3.0  MAE own=10.82 mkt=10.56  n= 703 win=0.506 roi=-0.011
+  hl= 4 ridge= 8.0 thr=4.0  MAE own=10.82 mkt=10.56  n= 389 win=0.486 roi=-0.050
+  hl= 4 ridge=32.0 thr=2.0  MAE own=10.91 mkt=10.56  n=1463 win=0.500 roi=-0.024
+  hl= 4 ridge=32.0 thr=3.0  MAE own=10.91 mkt=10.56  n=1010 win=0.503 roi=-0.018
+  hl= 4 ridge=32.0 thr=4.0  MAE own=10.91 mkt=10.56  n= 671 win=0.504 roi=-0.015
+  hl= 8 ridge= 2.0 thr=2.0  MAE own=10.93 mkt=10.56  n=1321 win=0.496 roi=-0.031
+  hl= 8 ridge= 2.0 thr=3.0  MAE own=10.93 mkt=10.56  n= 893 win=0.497 roi=-0.028
+  hl= 8 ridge= 2.0 thr=4.0  MAE own=10.93 mkt=10.56  n= 572 win=0.502 roi=-0.019
+  hl= 8 ridge= 8.0 thr=2.0  MAE own=10.78 mkt=10.56  n=1087 win=0.502 roi=-0.018
+  hl= 8 ridge= 8.0 thr=3.0  MAE own=10.78 mkt=10.56  n= 633 win=0.501 roi=-0.022
+  hl= 8 ridge= 8.0 thr=4.0  MAE own=10.78 mkt=10.56  n= 330 win=0.509 roi=-0.005
+  hl= 8 ridge=32.0 thr=2.0  MAE own=10.85 mkt=10.56  n=1376 win=0.500 roi=-0.024
+  hl= 8 ridge=32.0 thr=3.0  MAE own=10.85 mkt=10.56  n= 898 win=0.516 roi=+0.007
+  hl= 8 ridge=32.0 thr=4.0  MAE own=10.85 mkt=10.56  n= 537 win=0.516 roi=+0.008
+  hl=16 ridge= 2.0 thr=2.0  MAE own=10.94 mkt=10.56  n=1417 win=0.495 roi=-0.032
+  hl=16 ridge= 2.0 thr=3.0  MAE own=10.94 mkt=10.56  n= 960 win=0.495 roi=-0.033
+  hl=16 ridge= 2.0 thr=4.0  MAE own=10.94 mkt=10.56  n= 644 win=0.502 roi=-0.020
+  hl=16 ridge= 8.0 thr=2.0  MAE own=10.80 mkt=10.56  n=1159 win=0.507 roi=-0.009
+  hl=16 ridge= 8.0 thr=3.0  MAE own=10.80 mkt=10.56  n= 690 win=0.507 roi=-0.008
+  hl=16 ridge= 8.0 thr=4.0  MAE own=10.80 mkt=10.56  n= 390 win=0.528 roi=+0.032
+  hl=16 ridge=32.0 thr=2.0  MAE own=10.81 mkt=10.56  n=1301 win=0.506 roi=-0.012
+  hl=16 ridge=32.0 thr=3.0  MAE own=10.81 mkt=10.56  n= 833 win=0.513 roi=+0.001
+  hl=16 ridge=32.0 thr=4.0  MAE own=10.81 mkt=10.56  n= 464 win=0.524 roi=+0.024
+
+FROZEN hl=16 ridge=8.0 thr=4.0
+TEST 2020-2026: n=356 win=0.486 roi=-0.066 over_share=0.70  MAE own=10.70 mkt=10.30
+  breakeven at -110 is 0.524; 95% band on win rate ~ +/-0.052
+
+Verdict: no edge. The market total is more accurate than the results-only view (MAE 10.30 vs 10.70) and the
+frozen gap rule lost. Week 8 open games: only IND@JAX OVER 45.5 cleared the gap (+4.6), not posted as a pick.
