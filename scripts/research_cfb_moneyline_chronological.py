@@ -37,13 +37,13 @@ def _finite_number(value):
 
 def fit_residual(data):
     """OLS residual on model_margin vs realized margin; used only for research screening."""
-    if len(data) < 300 or len({x["season"] for x in data}) < 3:
-        raise ValueError("CFB_ML_CHRONO_TRAINING_INSUFFICIENT")
-    # One non-finite prediction can otherwise poison OLS with NaN, after
-    # which grade() silently selects AWAY for every held-out game.
+    # Integrity precedes coverage: a short sample must not hide a corrupt
+    # source row behind INSUFFICIENT_CHRONO_TRAINING.
     if any(not _finite_number(r.get("model_margin"))
            or not _finite_number(r.get("actual_margin")) for r in data):
         raise ValueError("CFB_ML_CHRONO_TRAINING_NONFINITE_OR_NONNUMERIC")
+    if len(data) < 300 or len({x["season"] for x in data}) < 3:
+        raise ValueError("CFB_ML_CHRONO_TRAINING_INSUFFICIENT")
     xs = [r["model_margin"] for r in data]
     ys = [r["actual_margin"] for r in data]
     a = sum(xs) / len(xs)
