@@ -1,0 +1,95 @@
+# CBB on SBR archive, run 2026-11-01T14:50:23Z in Claude sandbox
+# data: ajhildebrand/WinLossSequencesSpring24@12f7b82 sportsbookreviewsonline/ncaa_basketball/raw_data, seasons 2015-16..2019-20
+# sha1 of extracted CSVs:
+#   77cba9e73f4dc227c9ce0bf7be80d4cd7c7cab08  2015-16.csv
+#   31628836bd0e4087341ff7634ff28cf7399220b3  2016-17.csv
+#   5d57624e99e0251a45d7a999287f7ae2fc1547a9  2017-18.csv
+#   1df092592b7ab5b69060a3c630448f01d812a617  2018-19.csv
+#   cde97569423e69d00c9bdae33a619290428f7c3d  2019-20.csv
+# cmd: python simple/backtest_cbb_sbr.py <dir of those 5 CSVs>
+# Lines are SBR's recorded open/close (not DraftKings); all bets graded at -110.
+games parsed: 23014 (dropped 31 unreadable pairs); by season {2016: 4014, 2017: 4019, 2018: 4060, 2019: 5593, 2020: 5328}
+with an open: 22619; mean |open->close| = 1.00 pts
+sanity: mean(result - close) = +0.09, MAE(result vs close) = 8.67
+
+TRAIN grid 2016-2018, graded at -110
+  CLOSE hl=15 ridge= 2.0 thr=2.0 copy-MAE=3.66 n= 7938 win=0.495 roi=-0.054
+  CLOSE hl=15 ridge= 2.0 thr=3.0 copy-MAE=3.66 n= 6549 win=0.492 roi=-0.059
+  CLOSE hl=15 ridge= 2.0 thr=4.0 copy-MAE=3.66 n= 5336 win=0.499 roi=-0.047
+  CLOSE hl=15 ridge= 2.0 thr=6.0 copy-MAE=3.66 n= 3387 win=0.508 roi=-0.031
+  CLOSE hl=15 ridge= 8.0 thr=2.0 copy-MAE=5.04 n= 8580 win=0.499 roi=-0.046
+  CLOSE hl=15 ridge= 8.0 thr=3.0 copy-MAE=5.04 n= 7381 win=0.500 roi=-0.045
+  CLOSE hl=15 ridge= 8.0 thr=4.0 copy-MAE=5.04 n= 6432 win=0.497 roi=-0.050
+  CLOSE hl=15 ridge= 8.0 thr=6.0 copy-MAE=5.04 n= 4545 win=0.502 roi=-0.042
+  CLOSE hl=30 ridge= 2.0 thr=2.0 copy-MAE=3.33 n= 7454 win=0.492 roi=-0.060
+  CLOSE hl=30 ridge= 2.0 thr=3.0 copy-MAE=3.33 n= 5971 win=0.493 roi=-0.057
+  CLOSE hl=30 ridge= 2.0 thr=4.0 copy-MAE=3.33 n= 4684 win=0.499 roi=-0.047
+  CLOSE hl=30 ridge= 2.0 thr=6.0 copy-MAE=3.33 n= 2789 win=0.507 roi=-0.031
+  CLOSE hl=30 ridge= 8.0 thr=2.0 copy-MAE=4.61 n= 8351 win=0.498 roi=-0.048
+  CLOSE hl=30 ridge= 8.0 thr=3.0 copy-MAE=4.61 n= 7151 win=0.500 roi=-0.045
+  CLOSE hl=30 ridge= 8.0 thr=4.0 copy-MAE=4.61 n= 6139 win=0.500 roi=-0.045
+  CLOSE hl=30 ridge= 8.0 thr=6.0 copy-MAE=4.61 n= 4285 win=0.501 roi=-0.043
+  CLOSE hl=60 ridge= 2.0 thr=2.0 copy-MAE=3.06 n= 7055 win=0.490 roi=-0.064
+  CLOSE hl=60 ridge= 2.0 thr=3.0 copy-MAE=3.06 n= 5365 win=0.490 roi=-0.064
+  CLOSE hl=60 ridge= 2.0 thr=4.0 copy-MAE=3.06 n= 4119 win=0.497 roi=-0.051
+  CLOSE hl=60 ridge= 2.0 thr=6.0 copy-MAE=3.06 n= 2368 win=0.501 roi=-0.042
+  CLOSE hl=60 ridge= 8.0 thr=2.0 copy-MAE=4.28 n= 8137 win=0.498 roi=-0.049
+  CLOSE hl=60 ridge= 8.0 thr=3.0 copy-MAE=4.28 n= 6894 win=0.498 roi=-0.049
+  CLOSE hl=60 ridge= 8.0 thr=4.0 copy-MAE=4.28 n= 5825 win=0.499 roi=-0.046
+  CLOSE hl=60 ridge= 8.0 thr=6.0 copy-MAE=4.28 n= 3978 win=0.499 roi=-0.046
+  OPEN  view=res hl=15 ridge= 2.0 thr=1.0 n= 9587 avgCLV=-0.03pts beat-close=0.397 win@open=0.494 roi=-0.055
+  OPEN  view=res hl=15 ridge= 2.0 thr=2.0 n= 7930 avgCLV=-0.03pts beat-close=0.399 win@open=0.493 roi=-0.058
+  OPEN  view=res hl=15 ridge= 2.0 thr=3.0 n= 6488 avgCLV=-0.04pts beat-close=0.393 win@open=0.490 roi=-0.063
+  OPEN  view=res hl=15 ridge= 2.0 thr=4.0 n= 5233 avgCLV=-0.05pts beat-close=0.392 win@open=0.495 roi=-0.055
+  OPEN  view=mkt hl=15 ridge= 2.0 thr=1.0 n= 8818 avgCLV=+0.10pts beat-close=0.442 win@open=0.509 roi=-0.028
+  OPEN  view=mkt hl=15 ridge= 2.0 thr=2.0 n= 6612 avgCLV=+0.12pts beat-close=0.448 win@open=0.509 roi=-0.027
+  OPEN  view=mkt hl=15 ridge= 2.0 thr=3.0 n= 4918 avgCLV=+0.10pts beat-close=0.443 win@open=0.507 roi=-0.031
+  OPEN  view=mkt hl=15 ridge= 2.0 thr=4.0 n= 3542 avgCLV=+0.07pts beat-close=0.433 win@open=0.507 roi=-0.032
+  OPEN  view=res hl=15 ridge= 8.0 thr=1.0 n= 9952 avgCLV=-0.02pts beat-close=0.405 win@open=0.498 roi=-0.048
+  OPEN  view=res hl=15 ridge= 8.0 thr=2.0 n= 8628 avgCLV=-0.02pts beat-close=0.406 win@open=0.499 roi=-0.046
+  OPEN  view=res hl=15 ridge= 8.0 thr=3.0 n= 7430 avgCLV=-0.02pts beat-close=0.403 win@open=0.499 roi=-0.046
+  OPEN  view=res hl=15 ridge= 8.0 thr=4.0 n= 6356 avgCLV=-0.02pts beat-close=0.401 win@open=0.501 roi=-0.043
+  OPEN  view=mkt hl=15 ridge= 8.0 thr=1.0 n= 9537 avgCLV=+0.02pts beat-close=0.419 win@open=0.503 roi=-0.039
+  OPEN  view=mkt hl=15 ridge= 8.0 thr=2.0 n= 8024 avgCLV=+0.03pts beat-close=0.419 win@open=0.503 roi=-0.040
+  OPEN  view=mkt hl=15 ridge= 8.0 thr=3.0 n= 6702 avgCLV=+0.02pts beat-close=0.418 win@open=0.505 roi=-0.035
+  OPEN  view=mkt hl=15 ridge= 8.0 thr=4.0 n= 5486 avgCLV=+0.03pts beat-close=0.418 win@open=0.501 roi=-0.043
+  OPEN  view=res hl=30 ridge= 2.0 thr=1.0 n= 9193 avgCLV=-0.04pts beat-close=0.394 win@open=0.492 roi=-0.060
+  OPEN  view=res hl=30 ridge= 2.0 thr=2.0 n= 7350 avgCLV=-0.04pts beat-close=0.393 win@open=0.490 roi=-0.063
+  OPEN  view=res hl=30 ridge= 2.0 thr=3.0 n= 5778 avgCLV=-0.06pts beat-close=0.388 win@open=0.493 roi=-0.058
+  OPEN  view=res hl=30 ridge= 2.0 thr=4.0 n= 4482 avgCLV=-0.09pts beat-close=0.379 win@open=0.497 roi=-0.049
+  OPEN  view=mkt hl=30 ridge= 2.0 thr=1.0 n= 8652 avgCLV=+0.13pts beat-close=0.451 win@open=0.511 roi=-0.024
+  OPEN  view=mkt hl=30 ridge= 2.0 thr=2.0 n= 6224 avgCLV=+0.14pts beat-close=0.455 win@open=0.509 roi=-0.027
+  OPEN  view=mkt hl=30 ridge= 2.0 thr=3.0 n= 4342 avgCLV=+0.11pts beat-close=0.445 win@open=0.512 roi=-0.023
+  OPEN  view=mkt hl=30 ridge= 2.0 thr=4.0 n= 3098 avgCLV=+0.07pts beat-close=0.438 win@open=0.510 roi=-0.026
+  OPEN  view=res hl=30 ridge= 8.0 thr=1.0 n= 9803 avgCLV=-0.03pts beat-close=0.404 win@open=0.497 roi=-0.050
+  OPEN  view=res hl=30 ridge= 8.0 thr=2.0 n= 8417 avgCLV=-0.02pts beat-close=0.405 win@open=0.499 roi=-0.047
+  OPEN  view=res hl=30 ridge= 8.0 thr=3.0 n= 7182 avgCLV=-0.03pts beat-close=0.399 win@open=0.500 roi=-0.044
+  OPEN  view=res hl=30 ridge= 8.0 thr=4.0 n= 6080 avgCLV=-0.02pts beat-close=0.402 win@open=0.499 roi=-0.046
+  OPEN  view=mkt hl=30 ridge= 8.0 thr=1.0 n= 9393 avgCLV=+0.04pts beat-close=0.423 win@open=0.505 roi=-0.036
+  OPEN  view=mkt hl=30 ridge= 8.0 thr=2.0 n= 7649 avgCLV=+0.04pts beat-close=0.423 win@open=0.508 roi=-0.030
+  OPEN  view=mkt hl=30 ridge= 8.0 thr=3.0 n= 6187 avgCLV=+0.05pts beat-close=0.424 win@open=0.502 roi=-0.040
+  OPEN  view=mkt hl=30 ridge= 8.0 thr=4.0 n= 4974 avgCLV=+0.03pts beat-close=0.420 win@open=0.502 roi=-0.041
+  OPEN  view=res hl=60 ridge= 2.0 thr=1.0 n= 8872 avgCLV=-0.05pts beat-close=0.388 win@open=0.491 roi=-0.062
+  OPEN  view=res hl=60 ridge= 2.0 thr=2.0 n= 6839 avgCLV=-0.06pts beat-close=0.386 win@open=0.489 roi=-0.065
+  OPEN  view=res hl=60 ridge= 2.0 thr=3.0 n= 5133 avgCLV=-0.09pts beat-close=0.377 win@open=0.487 roi=-0.069
+  OPEN  view=res hl=60 ridge= 2.0 thr=4.0 n= 3851 avgCLV=-0.11pts beat-close=0.372 win@open=0.494 roi=-0.056
+  OPEN  view=mkt hl=60 ridge= 2.0 thr=1.0 n= 8574 avgCLV=+0.14pts beat-close=0.457 win@open=0.511 roi=-0.024
+  OPEN  view=mkt hl=60 ridge= 2.0 thr=2.0 n= 6041 avgCLV=+0.14pts beat-close=0.459 win@open=0.505 roi=-0.034
+  OPEN  view=mkt hl=60 ridge= 2.0 thr=3.0 n= 4069 avgCLV=+0.12pts beat-close=0.452 win@open=0.508 roi=-0.029
+  OPEN  view=mkt hl=60 ridge= 2.0 thr=4.0 n= 2760 avgCLV=+0.08pts beat-close=0.442 win@open=0.504 roi=-0.038
+  OPEN  view=res hl=60 ridge= 8.0 thr=1.0 n= 9696 avgCLV=-0.03pts beat-close=0.401 win@open=0.495 roi=-0.053
+  OPEN  view=res hl=60 ridge= 8.0 thr=2.0 n= 8205 avgCLV=-0.03pts beat-close=0.400 win@open=0.499 roi=-0.047
+  OPEN  view=res hl=60 ridge= 8.0 thr=3.0 n= 6907 avgCLV=-0.04pts beat-close=0.397 win@open=0.498 roi=-0.048
+  OPEN  view=res hl=60 ridge= 8.0 thr=4.0 n= 5769 avgCLV=-0.03pts beat-close=0.396 win@open=0.496 roi=-0.052
+  OPEN  view=mkt hl=60 ridge= 8.0 thr=1.0 n= 9272 avgCLV=+0.04pts beat-close=0.426 win@open=0.505 roi=-0.035
+  OPEN  view=mkt hl=60 ridge= 8.0 thr=2.0 n= 7385 avgCLV=+0.04pts beat-close=0.427 win@open=0.505 roi=-0.035
+  OPEN  view=mkt hl=60 ridge= 8.0 thr=3.0 n= 5842 avgCLV=+0.03pts beat-close=0.423 win@open=0.503 roi=-0.038
+  OPEN  view=mkt hl=60 ridge= 8.0 thr=4.0 n= 4522 avgCLV=+0.02pts beat-close=0.416 win@open=0.498 roi=-0.049
+
+=== TEST 2019-2020 (run once with frozen settings) ===
+CLOSE frozen hl=15 ridge=2.0 thr=6.0: copy-MAE=3.75 n=3317 win=0.493 roi=-0.057 (breakeven 0.524, 95% band +/-0.017)
+  2019: n=1693 win=0.496 roi=-0.052
+  2020: n=1624 win=0.490 roi=-0.063
+OPEN frozen view=mkt hl=60 ridge=2.0 thr=1.0: n= 7999 avgCLV=+0.25pts beat-close=0.466 win@open=0.522 roi=-0.004 (95% band +/-0.011)
+  2019: n= 4025 avgCLV=+0.26pts beat-close=0.451 win@open=0.525 roi=+0.002
+  2020: n= 3974 avgCLV=+0.24pts beat-close=0.480 win@open=0.518 roi=-0.011
