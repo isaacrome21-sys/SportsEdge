@@ -1,0 +1,56 @@
+{
+ "asof": "2026-11-01T19:57:55.348220+00:00",
+ "bets": [
+  {
+   "fixture_id": "id1100064873658208",
+   "start": "2026-11-02T05:00:00.000Z",
+   "tournament": "NCAA, Regular Season",
+   "game": "89120 @ 101873",
+   "market_id": "111576",
+   "market": "Over Under Team 2 (incl. overtime) 79.5",
+   "player": "",
+   "line": "",
+   "side": "111577",
+   "dk_decimal": 2.24,
+   "dk_american": 124,
+   "pinnacle_fair_p": 0.469,
+   "ev": 0.0505
+  },
+  {
+   "fixture_id": "id1100013273719482",
+   "start": "2026-11-02T02:00:00.000Z",
+   "tournament": "NBA",
+   "game": "3433 @ 3427",
+   "market_id": "11726",
+   "market": "Over Under Second Quarter 54.5",
+   "player": "",
+   "line": "",
+   "side": "11726",
+   "dk_decimal": 2.33,
+   "dk_american": 133,
+   "pinnacle_fair_p": 0.4459,
+   "ev": 0.0389
+  },
+  {
+   "fixture_id": "id1400003171515976",
+   "start": "2026-11-02T01:20:00.000Z",
+   "tournament": "NFL",
+   "game": "4428 @ 4432",
+   "market_id": "14531",
+   "market": "Over Under First Half 20.5",
+   "player": "",
+   "line": "",
+   "side": "14531",
+   "dk_decimal": 2.14,
+   "dk_american": 114,
+   "pinnacle_fair_p": 0.4831,
+   "ev": 0.0338
+  }
+ ],
+ "n_compared": 864,
+ "notes": [
+  "tournaments: NBA, NCAA Women, Regular Season, NCAA, Regular Season, NFL",
+  "fixtures DK 173 / Pinnacle 12",
+  "OddsPapi calls today 11/20"
+ ]
+}
