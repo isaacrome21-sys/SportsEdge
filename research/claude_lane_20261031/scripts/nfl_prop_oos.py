@@ -23,7 +23,11 @@ Guards (reviews 5726665611 and 5726872447 on #2979):
   the original Python number before float coercion, so a JSON int like 10**400 or mu=1.7e308
   makes the market INVALID instead of an uncaught OverflowError or an Inf line L; every
   generated line L must be finite; every pricer output p_fn(mu, L) must itself be a real
-  int/float (not bool, str, None) before it is stored, else the market is INVALID.
+  int/float (not bool, str, None) before it is stored, else the market is INVALID;
+- (review 5728331427 on #2995) the pricer output p goes through the same magnitude check on
+  the original number before float(p), so p=10**400 makes the market INVALID instead of an
+  uncaught OverflowError that aborts every market. Raw cells and pricer outputs share one
+  helper, _number_or_reason(), so the two paths cannot drift apart again.
 `python nfl_prop_oos.py --self-test` runs synthetic regressions without the pricer or data.
 """
 import importlib.util
@@ -65,7 +69,7 @@ def brier(r, s):
 
 
 SEASONS = (2025.0, 2026.0)
-RAW_ABS_MAX = 1e6  # no season, prop mean or prop outcome is anywhere near this
+RAW_ABS_MAX = 1e6  # no season, prop mean, prop outcome or probability is anywhere near this
 
 
 def _raw_cell_ok(c):
@@ -73,6 +77,20 @@ def _raw_cell_ok(c):
     coercion, so `true` -> 1.0 and "30" -> 30.0 can never be laundered (review 5727663452)."""
     return isinstance(c, (int, float, np.integer, np.floating)) and not isinstance(
         c, (bool, np.bool_))
+
+
+def _number_or_reason(c):
+    """Type and magnitude check on the ORIGINAL value, before any float coercion.
+
+    Returns None if c is a real number with |c| <= RAW_ABS_MAX (NaN and +/-Inf pass here and
+    are refused by the later finite / range checks), else a short reason. Python compares a
+    huge int with a float exactly, so this never overflows (reviews 5727926064, 5728331427).
+    """
+    if not _raw_cell_ok(c):
+        return f"type {type(c).__name__}"
+    if abs(c) > RAW_ABS_MAX and abs(c) != float("inf"):
+        return f"beyond +/-{RAW_ABS_MAX:g}"
+    return None
 
 
 def validate_raw(v):
@@ -85,9 +103,7 @@ def validate_raw(v):
         bad = [type(c).__name__ for c in row if not _raw_cell_ok(c)]
         if bad:
             return None, f"INVALID: raw row {i} has non-numeric cell type(s) {bad}"
-        # magnitude on the original number (exact Python int/float compare, never overflows);
-        # NaN and +/-Inf are left for the non-finite check below
-        if any(abs(c) > RAW_ABS_MAX and abs(c) != float("inf") for c in row):
+        if any(_number_or_reason(c) for c in row):
             return None, f"INVALID: raw row {i} has a cell beyond +/-{RAW_ABS_MAX:g}"
     if len(v) == 0:
         return np.empty((0, 3)), None
@@ -116,8 +132,9 @@ def market_rows(v, p_fn):
                 p = p_fn(mu, L)
                 if isinstance(p, np.ndarray) and p.ndim == 0 and p.dtype.kind in "fiu":
                     p = p.item()  # a 0-d numeric array from a vectorised pricer is a scalar
-                if not _raw_cell_ok(p):
-                    return None, f"INVALID: pricer returned {type(p).__name__}, not a number"
+                bad = _number_or_reason(p)
+                if bad:
+                    return None, f"INVALID: pricer returned {bad}, not a usable number"
                 out.append((float(p), float(y > L)))
         return as_rows(out), None
 
@@ -252,6 +269,29 @@ def self_test():
                   lambda mu, L: np.bool_(False), lambda mu, L: [0.5]):  # noqa: E731
         tr, te, why = market_rows(ok, bad_p)
         check(tr is None and why.startswith("INVALID: pricer"), why)
+    # review 5728331427 repro (#2995): a huge-int pricer output is INVALID for that market,
+    # not an uncaught OverflowError from float(p); same for a huge negative int
+    for huge in (10 ** 400, -(10 ** 400), 10 ** 7):
+        tr, te, why = market_rows(ok, lambda mu, L, h=huge: h)
+        check(tr is None and why.startswith("INVALID: pricer") and "beyond" in why, why)
+    # ...and main()'s per-market loop keeps going: a huge-int market next to a good one
+    outs = {}
+    for m, pf in (("bad", lambda mu, L: 10 ** 400), ("good", fake_p)):
+        tr, te, why = market_rows(ok, pf)
+        if not why:
+            _res, why = evaluate(tr, te)
+        outs[m] = why
+    check(outs["bad"].startswith("INVALID: pricer") and outs["good"] is None, outs)
+    # pricer NaN / Inf / out-of-range floats pass the magnitude check but are refused by
+    # validate() in evaluate(), so no numeric result is printed
+    for odd in (float("nan"), float("inf"), 1.5, -0.1):
+        tr, te, why = market_rows(ok, lambda mu, L, o=odd: o)
+        check(why is None, why)
+        res, why = evaluate(tr, te)
+        check(res is None and why.startswith("INVALID"), (odd, why))
+    # integer pricer outputs 0 / 1 stay legal (in range, out of band)
+    tr, te, why = market_rows(ok, lambda mu, L: 1)
+    check(why is None and tr.shape == (3, 2), why)
     # a numpy float pricer output stays legal
     tr, te, why = market_rows(ok, lambda mu, L: np.float64(0.5))
     check(why is None and tr.shape == (3, 2), why)
