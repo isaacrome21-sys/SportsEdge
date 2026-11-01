@@ -130,5 +130,38 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
         self.assertFalse(report["authority"]["bets"])
 
 
+    def test_nonfinite_training_row_cannot_turn_fit_into_nan(self):
+        # Three historical seasons, 300 rows: one NaN previously poisoned
+        # the OLS coefficients and generated an all-AWAY synthetic card.
+        train = [r for y in (2018, 2019, 2020) for r in rows(y, 100)]
+        good = fit_residual(train)
+        self.assertTrue(__import__("math").isfinite(good["weight"]))
+        for field in ("model_margin", "actual_margin"):
+            for bad in (float("nan"), float("inf"), -float("inf"), "bad"):
+                damaged = [dict(x) for x in train]
+                damaged[0][field] = bad
+                with self.subTest(field=field, bad=str(bad)):
+                    with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+                        fit_residual(damaged)
+
+    def test_nonfinite_fit_and_holdout_refused_before_any_side_selection(self):
+        valid = [
+            {"model_margin": 4.0, "home_won": True},
+            {"model_margin": -5.0, "home_won": False},
+        ]
+        self.assertEqual(grade(valid, {"intercept": 0.0, "weight": 1.0})["decisions"], 2)
+        for bad in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(fit=str(bad)):
+                with self.assertRaisesRegex(ValueError, "GRADE_INVALID_FIT"):
+                    grade(valid, {"intercept": bad, "weight": 1.0})
+            with self.subTest(holdout=str(bad)):
+                with self.assertRaisesRegex(ValueError, "GRADE_INVALID_HOLDOUT"):
+                    grade(valid + [{"model_margin": bad, "home_won": True}],
+                          {"intercept": 0.0, "weight": 1.0})
+        with self.assertRaisesRegex(ValueError, "GRADE_INVALID_HOLDOUT"):
+            grade([{"model_margin": 4.0, "home_won": 1}],
+                  {"intercept": 0.0, "weight": 1.0})
+
+
 if __name__ == "__main__":
     unittest.main()
