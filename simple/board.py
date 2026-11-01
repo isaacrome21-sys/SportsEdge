@@ -9,11 +9,12 @@ One command:  python simple/board.py run OUT_DIR
      dropped as a likely mapping error.
 Hard cap: MAX_CALLS_PER_DAY OddsPapi calls (owner budget 20/day, #2447 6561970754), counted in OUT_DIR/calls.json.
 A calls.json that exists but cannot be read as a JSON object fails closed (no calls).
+Calls are spaced PACE_S apart; a 429 is retried once (the retry is budgeted too).
 NHL is paused and MLB DK auto-acquisition is off, so neither is requested.
 The key comes from SPORTSEDGE_ODDSPAPI_KEY and is never printed or written.
 `python simple/board.py selftest` runs offline checks with synthetic payloads.
 """
-import json, os, re, sys
+import json, os, re, sys, time
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -23,6 +24,7 @@ API = "https://api.oddspapi.io/v4"
 SPORTS = {14: re.compile(r"^(NFL|NCAA.*)$", re.I), 11: re.compile(r"^(NBA|NCAA.*)$", re.I)}
 MIN_EV, MAX_EV = 0.03, 0.40
 MAX_CALLS_PER_DAY = 20
+PACE_S, RETRY_429_S, MAX_RETRY_WAIT_S = 3.0, 15.0, 60.0
 LINE_SIDE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*/\s*([A-Za-z]+)\s*$")
 
 
@@ -66,23 +68,41 @@ class Budget:
         os.replace(tmp, self.path)
 
 
-def get(endpoint, params, key, budget, opener=urlopen):
-    budget.spend()  # counted before the request, so a failed call still counts
-    req = Request(API + endpoint + "?" + urlencode(dict(params, apiKey=key)),
-                  headers={"Accept": "application/json", "User-Agent": "SportsEdge-Board/1"})
-    try:
-        with opener(req, timeout=60) as r:
-            blob = r.read(60_000_001)
-    except HTTPError as e:
-        raise Refused("HTTP_%d_%s" % (e.code, endpoint)) from None
-    except (URLError, OSError):
-        raise Refused("UNAVAILABLE_" + endpoint) from None
-    if len(blob) > 60_000_000:
-        raise Refused("TOO_LARGE_" + endpoint)
-    try:
-        return json.loads(blob)
-    except ValueError:
-        raise Refused("BAD_JSON_" + endpoint) from None
+_last_call = [None]
+
+
+def get(endpoint, params, key, budget, opener=urlopen, sleep=time.sleep, clock=time.monotonic):
+    """One OddsPapi GET. Calls are spaced PACE_S apart (the provider 429s back-to-back calls).
+    A 429 is retried once after Retry-After (capped) or RETRY_429_S; every attempt is budgeted."""
+    for attempt in (0, 1):
+        if _last_call[0] is not None:
+            wait = PACE_S - (clock() - _last_call[0])
+            if wait > 0:
+                sleep(wait)
+        budget.spend()  # counted before the request, so a failed call still counts
+        _last_call[0] = clock()
+        req = Request(API + endpoint + "?" + urlencode(dict(params, apiKey=key)),
+                      headers={"Accept": "application/json", "User-Agent": "SportsEdge-Board/1"})
+        try:
+            with opener(req, timeout=60) as r:
+                blob = r.read(60_000_001)
+        except HTTPError as e:
+            if e.code == 429 and attempt == 0:
+                try:
+                    pause = min(max(float(e.headers.get("Retry-After")), 0.0), MAX_RETRY_WAIT_S)
+                except (TypeError, ValueError, AttributeError):
+                    pause = RETRY_429_S
+                sleep(pause)
+                continue
+            raise Refused("HTTP_%d_%s" % (e.code, endpoint)) from None
+        except (URLError, OSError):
+            raise Refused("UNAVAILABLE_" + endpoint) from None
+        if len(blob) > 60_000_000:
+            raise Refused("TOO_LARGE_" + endpoint)
+        try:
+            return json.loads(blob)
+        except ValueError:
+            raise Refused("BAD_JSON_" + endpoint) from None
 
 
 # ---------- parsing ----------
@@ -334,6 +354,46 @@ def selftest():
     # unreadable path (a directory) fails closed
     os.mkdir(os.path.join(d, "dir.json"))
     assert Budget(os.path.join(d, "dir.json"), "2026-11-01", cap=2).corrupt
+
+    # pacing + single 429 retry, all attempts budgeted (fake clock, no network)
+    import io
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def opener_seq(codes):
+        it = iter(codes)
+
+        def op(req, timeout=60):
+            c = next(it)
+            if c != 200:
+                raise HTTPError(req.full_url, c, "x", {"Retry-After": "7"} if c == 429 else {}, None)
+            return Resp(b'[{"ok": 1}]')
+        return op
+
+    t, slept = [0.0], []
+
+    def fake_sleep(s):
+        slept.append(s); t[0] += s
+
+    clock = lambda: t[0]
+    _last_call[0] = None
+    pb = Budget(os.path.join(d, "pace.json"), "2026-11-01", cap=10)
+    assert get("/x", {}, "k", pb, opener_seq([200]), fake_sleep, clock) == [{"ok": 1}] and slept == []
+    assert get("/x", {}, "k", pb, opener_seq([200]), fake_sleep, clock) == [{"ok": 1}] and slept == [PACE_S]
+    assert pb.used() == 2
+    slept.clear()
+    assert get("/x", {}, "k", pb, opener_seq([429, 200]), fake_sleep, clock) == [{"ok": 1}]
+    assert 7.0 in slept and pb.used() == 4, (slept, pb.used())
+    try:
+        get("/x", {}, "k", pb, opener_seq([429, 429]), fake_sleep, clock); raise AssertionError("429 twice not refused")
+    except Refused as e:
+        assert str(e) == "HTTP_429_/x" and pb.used() == 6, (e, pb.used())
+    _last_call[0] = None
     print("selftest ok")
 
 
