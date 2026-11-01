@@ -204,7 +204,30 @@ def _team_total_quotes(entry: dict, sched) -> dict:
             raise DriverRefusal(
                 "DRIVER_CAPTURE_MALFORMED",
                 f"{sched.game_id}: team_totals[{key!r}] is not an object")
+        # The current capture contract is an atomic paired quote.  Never
+        # overwrite explicitly supplied side clocks with the common clock:
+        # doing so can turn a >150s pair into a manufactured zero-span pair.
         stamp = value.get("captured_at")
+        # Missing/invalid common clocks pass through to the pinned runner,
+        # which refuses that team's quote per row.  Refusing here would abort
+        # settlement of unrelated, valid team rows in the same capture.
+        atomic_time = _parse_ts(stamp)
+        has_over = "over_captured_at" in value
+        has_under = "under_captured_at" in value
+        if has_over != has_under:
+            raise DriverRefusal(
+                "DRIVER_CAPTURE_MALFORMED",
+                f"{sched.game_id}: team_totals[{key!r}] partial side clocks")
+        if has_over:
+            over_time = _parse_ts(value["over_captured_at"])
+            under_time = _parse_ts(value["under_captured_at"])
+            if (atomic_time is None or over_time is None
+                    or under_time is None or over_time != atomic_time
+                    or under_time != atomic_time):
+                raise DriverRefusal(
+                    "DRIVER_CAPTURE_MALFORMED",
+                    f"{sched.game_id}: team_totals[{key!r}] side clocks "
+                    "contradict atomic captured_at")
         by_code[code] = runner.PairedQuote(
             line=value.get("line"), over_price=value.get("over_price"),
             under_price=value.get("under_price"),
