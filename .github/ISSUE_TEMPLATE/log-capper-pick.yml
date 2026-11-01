@@ -1,0 +1,79 @@
+name: Log a capper pick
+description: Record an outside account's pick so CAPPER_VETTER_V1 can grade the account (CLV, adjusted ROI, transparency).
+title: "[CAPPER] "
+body:
+  - type: dropdown
+    id: account
+    attributes:
+      label: Account
+      options: ["@GUnit_81", "@CorbieBO", "@EliHershkovich", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: other_account
+    attributes:
+      label: Other account handle
+      placeholder: "Only if Account = Other"
+  - type: input
+    id: posted_at
+    attributes:
+      label: Posted at (Central)
+      description: Time of the post on X. Picks posted after tip are flagged and excluded.
+      placeholder: "2026-11-01 17:30"
+    validations:
+      required: true
+  - type: input
+    id: post_url
+    attributes:
+      label: Post link
+      placeholder: "https://x.com/..."
+  - type: dropdown
+    id: sport
+    attributes:
+      label: Sport
+      options: ["NCAAB", "NCAAF", "NFL", "NBA", "NHL", "MLB"]
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game (Away @ Home)
+      placeholder: "High Point @ Liberty"
+    validations:
+      required: true
+  - type: dropdown
+    id: market
+    attributes:
+      label: Market
+      options: ["Spread", "Total", "Moneyline", "1H Spread", "1H Total", "Team Total", "Prop"]
+    validations:
+      required: true
+  - type: input
+    id: selection
+    attributes:
+      label: Pick
+      placeholder: "Liberty, Under, ..."
+    validations:
+      required: true
+  - type: input
+    id: line
+    attributes:
+      label: Line
+      placeholder: "155.5 / +7.5 / blank for moneyline"
+  - type: input
+    id: price
+    attributes:
+      label: Price when posted
+      placeholder: "-115"
+    validations:
+      required: true
+  - type: input
+    id: units
+    attributes:
+      label: Units (if the account gives them)
+      placeholder: "1"
+  - type: dropdown
+    id: shows_losses
+    attributes:
+      label: Does this account post its losses?
+      options: ["Yes", "No", "Unknown"]
