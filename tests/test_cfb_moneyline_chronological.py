@@ -163,5 +163,22 @@ class CFBMoneylineChronologicalTest(unittest.TestCase):
                   {"intercept": 0.0, "weight": 1.0})
 
 
+    def test_study_does_not_mislabel_corrupt_history_as_insufficient_training(self):
+        # Each 2021-2025 fold uses 2017 as training; one nonfinite row must
+        # invalidate the study rather than silently drop all five folds.
+        data = [x for year in range(2017, 2026) for x in rows(year)]
+        clean = study(data)
+        self.assertEqual(len(clean["folds"]), 5)
+        damaged = [dict(x) for x in data]
+        damaged[0]["model_margin"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "TRAINING_NONFINITE_OR_NONNUMERIC"):
+            study(damaged)
+
+    def test_study_keeps_legitimate_insufficient_training_blocked(self):
+        report = study(rows(2025, 10))
+        self.assertEqual(report["status"], "BLOCKED_INSUFFICIENT_CHRONO_TRAINING")
+        self.assertEqual(report["folds"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
