@@ -2,7 +2,7 @@
 
   gh issues "[CAPPER] ..."  ->  pick records  ->  ESPN scoreboard (tip time,
   DK close, final score)  ->  grades  ->  artifacts/capper_vetter/
-  {picks.jsonl, rankings.json, rankings.md}  ->  optional comment on the
+  {picks.jsonl, rankings.json, rankings.md}  ->  optional in-place body update of the
   "[CAPPER RANKINGS]" tracker issue.
 
 Free sources only: GitHub CLI (workflow token) and ESPN's public scoreboard.
@@ -73,12 +73,6 @@ def build(issues: list[dict], offline: bool) -> tuple[list[dict], list[str]]:
             continue
         if p.get("void"):
             continue
-        key = (p["account"].lower(), p["away"].lower(), p["home"].lower(), p["market"],
-               p["selection"].lower(), p["line"])
-        if key in seen:
-            errors.append(f"#{it['number']}: duplicate of #{seen[key]}")
-            continue
-        seen[key] = it["number"]
         if not offline:
             ev = None
             try:
@@ -98,11 +92,22 @@ def build(issues: list[dict], offline: bool) -> tuple[list[dict], list[str]]:
                     errors.append(f"#{it['number']}: {e}")
             elif "espn_event_id" not in p:
                 errors.append(f"#{it['number']}: no {p['sport']} game found for {p['away']} @ {p['home']}")
+        # Dedupe only AFTER event identity is resolved: the same pick on a
+        # different event (rematch, doubleheader) is a different pick.
+        event = p.get("espn_event_id") or "posted:" + p["posted_at"][:10]
+        key = (p["account"].lower(), p["sport"], event, p["market"],
+               p["selection"].lower(), p["line"])
+        if key in seen:
+            errors.append(f"#{it['number']}: duplicate of #{seen[key]}")
+            continue
+        seen[key] = it["number"]
         picks.append(p)
     return picks, errors
 
 
 def post(markdown: str) -> None:
+    """Keep ONE tracker issue whose body is the current table (edited in
+    place each run), so issue-triggered runs never spam comments."""
     found = gh_json(["issue", "list", "--state", "open", "--search", f"{TRACKER_TITLE} in:title",
                      "--json", "number,title"])
     num = next((i["number"] for i in found if i["title"].startswith(TRACKER_TITLE)), None)
@@ -111,7 +116,7 @@ def post(markdown: str) -> None:
         subprocess.run(["gh", "issue", "create", "--title", f"{TRACKER_TITLE} Outside capper grades",
                         "--body-file", str(body)], check=True)
     else:
-        subprocess.run(["gh", "issue", "comment", str(num), "--body-file", str(body)], check=True)
+        subprocess.run(["gh", "issue", "edit", str(num), "--body-file", str(body)], check=True)
 
 
 def main() -> int:

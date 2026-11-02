@@ -14,7 +14,7 @@ Pure functions only (no network, no GitHub); the runner
   4. render_table()      ranked markdown for the tracker issue
 
 Writes nothing to the repository (freeze-reconciliation hold); output is a
-workflow artifact plus an issue comment.
+workflow artifact plus one tracker issue edited in place.
 """
 
 from __future__ import annotations
@@ -138,9 +138,9 @@ def apply_comments(pick: dict, comments: list[str]) -> None:
         if m:
             pick["close_price"] = int(m.group(1))
             pick["close_other_price"] = int(m.group(2)) if m.group(2) else None
-            if m.group(3):
-                pick["close_line"] = float(m.group(3))
+            pick["close_line"] = float(m.group(3)) if m.group(3) else None
             pick["close_source"] = "COMMENT"
+            _enforce_same_number(pick)
         m = re.search(r"result:\s*(win|loss|push)", t)
         if m:
             pick["result"] = m.group(1)
@@ -210,12 +210,36 @@ def _side(pick: dict, ev: dict) -> str:
 
 
 def _close_odds(ev: dict) -> dict | None:
+    """DraftKings close only. Any other provider is not the lane's
+    stated DK contract and never enters CLV (no fallback)."""
     odds = (ev.get("competitions") or [{}])[0].get("odds") or []
     for o in odds:
         name = (o.get("provider") or {}).get("name", "").lower()
-        if "draft" in name:
+        if "draftkings" in name.replace(" ", ""):
             return o
-    return odds[0] if odds else None
+    return None
+
+
+def _enforce_same_number(pick: dict) -> None:
+    """One comparability rule for every close source: price CLV only
+    when the close is evidenced at the pick's own number. A close at a
+    different number is recorded as a move and its prices dropped; a
+    non-moneyline close with no line evidence is not assumed same-line."""
+    if pick["market"] == "Moneyline" or "close_price" not in pick:
+        return
+    line, mine = pick.get("close_line"), pick.get("line")
+    if line is None or mine is None:
+        pick["close_source"] = pick.get("close_source", "") + "_NO_LINE_EVIDENCE"
+        pick.pop("close_price", None)
+        pick.pop("close_other_price", None)
+        return
+    a = abs(mine) if pick["market"] == "Total" else mine
+    b = abs(line) if pick["market"] == "Total" else line
+    if abs(a - b) > 1e-9:
+        pick["close_line_moved"] = round(b - a, 1)
+        pick.pop("close_price", None)
+        pick.pop("close_other_price", None)
+        pick["close_source"] = "LINE_MOVED_NO_PRICE_CLV"
 
 
 def _price(v):
@@ -262,17 +286,8 @@ def attach_close(pick: dict, ev: dict) -> None:
     if cp is None:
         return
     pick.update(close_price=cp, close_other_price=op, close_line=line,
-                close_source="ESPN_" + ((o.get("provider") or {}).get("name") or "ODDS").upper().replace(" ", "_"))
-    # A close at a different number than the pick is not comparable price-for-price;
-    # keep it only when the lines match (CLV in price), else drop it.
-    if pick["market"] != "Moneyline" and line is not None and pick["line"] is not None:
-        mine = abs(pick["line"]) if pick["market"] == "Total" else pick["line"]
-        theirs = abs(line) if pick["market"] == "Total" else line
-        if abs(mine - theirs) > 1e-9:
-            pick["close_line_moved"] = round(theirs - mine, 1)
-            for k in ("close_price", "close_other_price"):
-                pick.pop(k, None)
-            pick["close_source"] = "LINE_MOVED_NO_PRICE_CLV"
+                close_source="ESPN_DRAFTKINGS")
+    _enforce_same_number(pick)
 
 
 # ---------------------------------------------------------------- step 3
