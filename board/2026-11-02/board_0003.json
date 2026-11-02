@@ -1,0 +1,30 @@
+{
+ "asof": "2026-11-02T00:03:40.559134+00:00",
+ "bets": [
+  {
+   "fixture_id": "id1400003171515976",
+   "start": "2026-11-02T01:20:00.000Z",
+   "tournament": "NFL",
+   "game": "Philadelphia Eagles @ Washington Commanders",
+   "market_id": "14244",
+   "market": "Handicap (incl. overtime) -10.5",
+   "player": "",
+   "line": "",
+   "side": "14245",
+   "bet": "Philadelphia Eagles +10.5",
+   "dk_decimal": 1.467,
+   "dk_american": -214,
+   "dk_changed_at": "2026-11-01T23:54:08.746000+00:00",
+   "pinnacle_changed_at": "2026-11-01T23:56:23.220000+00:00",
+   "pinnacle_fair_p": 0.7033,
+   "ev": 0.0318
+  }
+ ],
+ "n_compared": 1342,
+ "notes": [
+  "NFL prop pulls 6/6 games (prop calls today 6/6)",
+  "tournaments: NBA, NCAA Women, Regular Season basketball, NCAA, Regular Season basketball, NCAA, Regular Season football, NFL",
+  "OddsPapi calls today 16/20",
+  "fixtures DK 200 / Pinnacle 135"
+ ]
+}

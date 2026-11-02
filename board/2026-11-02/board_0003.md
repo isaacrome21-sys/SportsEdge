@@ -1,0 +1,9 @@
+# SportsEdge picks 2026-11-02 00:03 UTC
+
+DraftKings price vs Pinnacle no-vig fair price. Bets = EV ≥ +3%. 1342 priced lines compared. Prices captured 00:03; recheck the DK price after 00:33 UTC.
+
+| # | Game | League | Market | Bet | DK | Fair % | EV |
+|---|---|---|---|---|---|---|---|
+| 1 | Philadelphia Eagles @ Washington Commanders | NFL | Handicap (incl. overtime) -10.5 | Philadelphia Eagles +10.5 | -214 | 70.3 | +3.2% |
+
+Notes: NFL prop pulls 6/6 games (prop calls today 6/6); tournaments: NBA, NCAA Women, Regular Season basketball, NCAA, Regular Season basketball, NCAA, Regular Season football, NFL; OddsPapi calls today 16/20; fixtures DK 200 / Pinnacle 135
