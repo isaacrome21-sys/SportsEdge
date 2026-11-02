@@ -314,7 +314,7 @@ def settle(pick: dict, ev: dict) -> None:
     h, a = _score(ev, "home"), _score(ev, "away")
     if h is None or a is None:
         return
-    side = _side(pick, ev)
+    side = _side(pick, ev) if pick["market"] != "Team Total" else None
     if pick["market"] == "Moneyline":
         mine, theirs = (h, a) if side == "home" else (a, h)
         d = mine - theirs
@@ -323,13 +323,37 @@ def settle(pick: dict, ev: dict) -> None:
         d = mine - theirs + pick["line"]
     elif pick["market"] == "Total":
         d = (h + a - pick["line"]) * (1 if side == "over" else -1)
-    else:  # Team Total: selection like "Liberty Under"
-        team = "home" if _team_hit(pick["selection"].split()[0], {"team": {"displayName": pick["home"]}}) else "away"
+    else:  # Team Total: selection like "New Mexico Under"
+        team, direction = team_total_side(pick, ev)
         pts = h if team == "home" else a
-        d = (pts - pick["line"]) * (-1 if "under" in pick["selection"].lower() else 1)
+        d = (pts - pick["line"]) * (1 if direction == "over" else -1)
     pick["result"] = "win" if d > 0 else ("loss" if d < 0 else "push")
     pick["result_source"] = "ESPN_FINAL"
     pick["final"] = f"{pick['away']} {a:g} @ {pick['home']} {h:g}"
+
+
+def team_total_side(pick: dict, ev: dict) -> tuple[str, str]:
+    """Resolve a team-total selection ("New Mexico Under", "Over Duke")
+    into (home|away, over|under) INDEPENDENTLY: the direction word is
+    required exactly once, and the remaining full team name must match
+    exactly one side (ESPN names or the logged game's names). Anything
+    else refuses -- a team total is never defaulted to a side."""
+    words = _norm(pick["selection"]).split()
+    dirs = [w for w in words if w in ("over", "under", "o", "u")]
+    if len(dirs) != 1:
+        raise PickParseError(f"team total needs exactly one Over/Under: {pick['selection']!r}")
+    direction = "over" if dirs[0] in ("over", "o") else "under"
+    name = " ".join(w for w in words if w not in ("over", "under", "o", "u"))
+    if not name:
+        raise PickParseError(f"team total names no team: {pick['selection']!r}")
+    comps = {c.get("homeAway"): c for c in ev["competitions"][0]["competitors"]}
+    sides = set()
+    for side in ("home", "away"):
+        if _team_hit(name, comps.get(side, {})) or _norm(name) == _norm(pick[side]):
+            sides.add(side)
+    if len(sides) != 1:
+        raise PickParseError(f"team total team is ambiguous or unknown: {pick['selection']!r}")
+    return sides.pop(), direction
 
 
 def scoreboard_dates(pick: dict, days_ahead: int = 2) -> list[str]:

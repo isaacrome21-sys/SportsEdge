@@ -190,3 +190,44 @@ def test_r2_rematch_is_not_a_duplicate():
         picks, errors = rcv.build(issues, offline=True)
     assert [p["issue"] for p in picks] == [1, 2]
     assert errors == ["#3: duplicate of #1"]
+
+
+# ---- regression for re-review 5731013053 (head ca7f764d) ----
+
+def _nm_event(home_pts=90, away_pts=60):
+    ev = _event(h=home_pts, a=away_pts)
+    ev["competitions"][0]["competitors"] = [
+        _team("home", "New Mexico Lobos", "New Mexico", "UNM", home_pts),
+        _team("away", "Duke Blue Devils", "Duke", "DUKE", away_pts)]
+    return ev
+
+
+def _tt(selection, line="80.5"):
+    body = (BODY.replace("High Point @ Liberty", "Duke @ New Mexico").replace("Total", "Team Total")
+            .replace("Under", selection).replace("155.5", line))
+    return parse_issue(11, "t", body)
+
+
+def test_r5_multiword_home_team_total_graded_on_home_points():
+    p = _tt("New Mexico Under")
+    settle(p, _nm_event(90, 60))
+    assert p["result"] == "loss"            # reviewer repro: was WIN
+    p = _tt("New Mexico Over")
+    settle(p, _nm_event(90, 60))
+    assert p["result"] == "win"
+
+
+def test_r5_away_team_total_and_direction_first():
+    p = _tt("Over Duke", "55.5")
+    settle(p, _nm_event(90, 60))
+    assert p["result"] == "win"
+    p = _tt("Duke Under", "55.5")
+    settle(p, _nm_event(90, 60))
+    assert p["result"] == "loss"
+
+
+def test_r5_ambiguous_or_directionless_team_total_refuses():
+    for sel in ("New Mexico", "Somebody Under", "Over Under Duke"):
+        p = _tt(sel)
+        with pytest.raises(PickParseError):
+            settle(p, _nm_event())
