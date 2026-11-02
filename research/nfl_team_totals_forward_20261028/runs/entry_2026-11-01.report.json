@@ -1,12 +1,12 @@
 {
  "assembly": "Priced per game by the pinned driver immediately after each game's own DK event-page read (QUOTE_STALE_180S envelope is per row and the driver's entry file is create-only per slate date), then assembled here from the unaltered per-game driver outputs; per-game reports verbatim under per_game.",
  "captures_file": "research/nfl_team_totals_forward_20261028/runs/capture_2026-11-01.json",
- "captures_sha256": "3ca9068d14047f1c5d56a5865de3e3e5029c0f770cd2858d8400c40fe17eeddd",
+ "captures_sha256": "e116e0ddabd0e0801d06b57188410e5b70154840f33641977669f49042882641",
  "command": "price",
  "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
  "driver_module_file": "/home/hatch/workspace/nfltt-sunday-20261101/wt/sportsedge/nfl_team_total_driver.py",
  "driver_refusals": [],
- "games_built": 11,
+ "games_built": 12,
  "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
  "history_games": 7075,
  "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
@@ -243,11 +243,46 @@
    "records_written": 2,
    "runner_refusals": [],
    "slate_date": "2026-11-01"
+  },
+  {
+   "captures_sha256": "ce5c06bab8054907b4c44051af968be5d37ddfaa4558935eca00a484d14de1df",
+   "command": "price",
+   "driver": "NFL_TEAM_TOTAL_DRIVER_V1",
+   "driver_refusals": [],
+   "games_built": 1,
+   "games_sha256": "a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0",
+   "history_games": 7075,
+   "history_snapshot_sha256": "aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717",
+   "lane_a_mode": "live",
+   "metrics_computed": false,
+   "notes": [],
+   "priced_at": "2026-11-02T00:08:55.099321+00:00",
+   "records_file": "/home/hatch/workspace/nfltt-snf-20261101/out/34118045/entry_2026-11-01.jsonl",
+   "records_written": 2,
+   "runner_refusals": [],
+   "slate_date": "2026-11-01"
   }
  ],
  "records_file": "research/nfl_team_totals_forward_20261028/runs/entry_2026-11-01.jsonl",
- "records_written": 22,
+ "records_written": 24,
  "runner_refusals": [],
  "slate_date": "2026-11-01",
+ "snf_append": {
+  "base_commit": "d8a91b947fd7b53fe28a3409e592117c70630fbc",
+  "base_note": "Stacked on the late-window slate branch (PR #3010 head): the noon+late files for this slate date are create-only in the driver's per-game out-dirs, so the SNF game was priced per game by the same pinned driver immediately after its own in-window DK read and appended unaltered, exactly as the noon and late assemblies were built.",
+  "driver_module_file": "/home/hatch/workspace/nfltt-snf-20261101/wt/sportsedge/nfl_team_total_driver.py",
+  "games": [
+   {
+    "event_id": 34118045,
+    "game": "Philadelphia Eagles @ Washington Commanders",
+    "priced_at": "2026-11-02T00:08:55.099321+00:00",
+    "read_ct": "2026-11-01T18:07:40-06:00",
+    "records_written": 2
+   }
+  ],
+  "games_file": "Same-day nflverse pull from the noon job (sha256 a2fe355f99912775fa36323f20b55300fc02a4dbe18a95a31f103a65a3602ca0; history snapshot sha256 aea631710cf8ddf45309402cfeaf6940701e91f64061c38645fe465c17963717, identical to noon and late).",
+  "job_id": "nfl-team-totals-runner-snf-20261101",
+  "metrics_computed": false
+ },
  "worktree_head": "aedb5ff6f0b1ed2d09e5a136b62488848c74f1a1"
 }
