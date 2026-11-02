@@ -189,23 +189,82 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertTrue(mains)
         return mains
 
-    def _assert_all_blocked(self, engine, code):
-        for m in self._mains(engine):
-            self.assertIsNone(m["lean"])
-            self.assertEqual(m["lean_block"], code)
-        self.assertEqual(engine["games"][0]["leans"], [])
+    def _assert_all_blocked(self, engine, code, md=None):
+        """Review 5731213002: a held game shows NO QB-sensitive model output."""
+        game = engine["games"][0]
+        mains = [m for m in game["markets"] if m["market"] in {"moneyline", "spread", "total"}]
+        self.assertTrue(mains)
+        for m in mains:
+            self.assertEqual(m["no_model"], "NO_MODEL:QB_HOLD")
+            self.assertEqual(m["qb_hold"], code)
+            for k in ("lean", "residual_research_prices", "residual_research_adjustment", "pick"):
+                self.assertIsNone(m.get(k))
+        self.assertEqual(game["leans"], [])
+        self.assertEqual(game["residual_research_prices"], [])
+        self.assertNotIn("projection", game["context"])
+        if md is not None:
+            self.assertNotRegex(md, r"research EV [+-]\d")
+            self.assertNotIn("Model (Attempt 9)", md)
+            self.assertIn("QB HOLD", md)
 
     def test_confirmed_starters_match_model_no_block(self):
-        engine, _ = self._run()
+        engine, md = self._run()
         self.assertIsNone(engine["games"][0]["context"]["qb_check"]["block"])
         for m in self._mains(engine):
             self.assertIsNone(m["lean_block"])
+        self.assertRegex(md, r"research EV [+-]\d")
+        self.assertNotIn("QB HOLD", md)
+
+    def test_snf_3015_board_mckee_vs_model_hurts_is_held_with_no_model_price(self):
+        """Exact #3015 evidence: nflverse last starter Jalen Hurts (model),
+        DK board QB props Tanner McKee (PHI) and Jayden Daniels (WAS)."""
+        hist = []
+        for i in range(8):
+            day = f"2026-10-{i + 1:02d}"
+            hist.append({"date": day, "id": f"p{i}", "home": "PHI", "away": "DAL", "hs": 24, "as": 20,
+                         "home_qb": "Jalen Hurts", "away_qb": "Dak Prescott"})
+            hist.append({"date": day, "id": f"w{i}", "home": "WAS", "away": "NYG", "hs": 23, "as": 17,
+                         "home_qb": "Jayden Daniels", "away_qb": "Jaxson Dart"})
+        ticket = {"slate": "2026-11-01", "observed_at": "2026-11-02T00:34:50Z", "games": [{
+            "home": "WAS", "away": "PHI", "commence_time": "2026-11-02T01:20:00Z", "markets": [
+                {"market": "moneyline", "line": None, "away_or_over_price": 225, "home_or_under_price": -278, "raw": "ML +225 -278"},
+                {"market": "spread", "line": 6.0, "away_or_over_price": -108, "home_or_under_price": -112, "raw": "Spread +6 -108 -112"},
+                {"market": "total", "line": 40.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "Total 40.5 -110 -110"},
+                {"market": "passing_yards", "line": 206.5, "away_or_over_price": -112, "home_or_under_price": -112,
+                 "raw": 'Prop "Tanner McKee" PassYards 206.5 -112 -112', "team": None, "player": "Tanner McKee"},
+                {"market": "passing_yards", "line": 202.5, "away_or_over_price": -112, "home_or_under_price": -112,
+                 "raw": 'Prop "Jayden Daniels" PassYards 202.5 -112 -112', "team": None, "player": "Jayden Daniels"},
+            ]}]}
+        for m in ticket["games"][0]["markets"]:
+            m["quote_retrieved_at"] = ticket["observed_at"]
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            (t / "ticket.json").write_text(json.dumps(ticket), encoding="utf-8")
+            (t / "hist.json").write_text(json.dumps(hist), encoding="utf-8")
+            env = {"PYTHONPATH": str(ROOT)}
+            # No starter source at all: the board alone must hold the game.
+            subprocess.run([sys.executable, "scripts/run_nfl_lines_card.py", "--input", str(t / "ticket.json"),
+                            "--history", str(t / "hist.json"), "--output", str(t / "card.json")],
+                           cwd=ROOT, env=env, check=True)
+            subprocess.run([sys.executable, "scripts/render_nfl_myspari_card.py", "--engine-output", str(t / "card.json"),
+                            "--snapshot", str(t / "ticket.json"), "--pre-context", "--out-dir", str(t / "out")],
+                           cwd=ROOT, env=env, check=True)
+            engine = json.loads((t / "card.json").read_text())
+            md = (t / "out" / "card.md").read_text()
+        check = engine["games"][0]["context"]["qb_check"]
+        self.assertEqual(check["block"], "CHANGE")
+        self.assertIn({"player": "Tanner McKee", "code": "PROP_QB_DIFFERS_FROM_MODEL_QB"},
+                      check["prop_corroboration"]["conflicts"])
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED", md)
+        self.assertIn("QB prop conflict: Tanner McKee", md)
+        self.assertNotIn("45.", md.split("Both sides")[0])         # no stale projected total
+        self.assertIn("ML PHI +225 / WAS -278", md)                 # DK quotes kept as record
 
     def test_confirmed_starter_differs_from_model_qb_blocks_change(self):
         engine, md = self._run(starters=_starters({"KC": "Patrick Mahomes", "BAL": "Tyler Huntley"}))
         self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["BAL"]["verdict"], "QB_CHANGE")
-        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED")
-        self.assertIn("QB change (BAL): confirmed starter Tyler Huntley", md)
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED", md)
+        self.assertIn("QB change (BAL): ESPN depth-chart QB1 Tyler Huntley", md)
         self.assertIn("built on Lamar Jackson", md)
 
     def test_no_starter_source_fails_closed(self):
@@ -213,7 +272,7 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"],
                          "STARTER_SOURCE_UNAVAILABLE")
         self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
-        self.assertIn("starting QB not confirmed", md)
+        self.assertIn("QB not established", md)
 
     def test_props_alone_never_confirm_a_starter(self):
         # Both QBs have DK props (default ticket) but no authoritative source.
@@ -259,8 +318,9 @@ class NflCardLeanTests(unittest.TestCase):
                                      {"player": "Lamar Jackson", "team": None},
                                      {"player": "Tyler Huntley", "team": None}])
         conflicts = engine["games"][0]["context"]["qb_check"]["prop_corroboration"]["conflicts"]
-        self.assertEqual([c["code"] for c in conflicts], ["PROP_QB_NOT_A_CONFIRMED_STARTER"])
-        self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+        self.assertEqual([c["code"] for c in conflicts],
+                         ["PROP_QB_NOT_A_CONFIRMED_STARTER", "PROP_QB_DIFFERS_FROM_MODEL_QB"])
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED")
 
     def test_ambiguous_or_surname_only_starter_rejected(self):
         for kc in ({"names": ["Patrick Mahomes", "Carson Wentz"], "injury_report_checked": True},
