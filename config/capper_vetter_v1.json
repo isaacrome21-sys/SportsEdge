@@ -1,0 +1,23 @@
+{
+  "engine": "CAPPER_VETTER_V1",
+  "accounts": [
+    {"handle": "@GUnit_81", "name": "Greg Peterson", "sports": ["NCAAB"], "style": "every-game spreads/totals"},
+    {"handle": "@CorbieBO", "name": "Corbie", "sports": ["NCAAB", "NCAAF"], "style": "projection + plays"},
+    {"handle": "@EliHershkovich", "name": "Eli Hershkovich", "sports": ["NCAAB"], "style": "market / futures"}
+  ],
+  "weights": {"clv": 0.40, "adj_roi": 0.25, "sample": 0.15, "transparency": 0.15, "risk": 0.05},
+  "shrinkage_k": 60,
+  "prior_roi": -0.045,
+  "default_vig": 0.045,
+  "clv_min_for_flag": 30,
+  "max_reasonable_units": 5,
+  "flag_penalty": 15,
+  "auto_fail_flags": ["HIDES_LOSSES"],
+  "scales": {
+    "clv_pct": [-3.0, 3.0],
+    "adj_roi": [-0.08, 0.06],
+    "sample_full": 500,
+    "drawdown_units": [5, 40]
+  },
+  "grades": [[85, "A"], [70, "B"], [55, "C"], [40, "D"], [0, "F"]]
+}
