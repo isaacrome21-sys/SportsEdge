@@ -31,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sportsedge.cbb_daily_card import (  # noqa: E402
-    CT, card_rows, fixtures_from_espn, render_card_markdown,
+    CT, SLATE_TZ, card_rows, fixtures_from_espn, render_card_markdown,
 )
 from sportsedge.cbb_efficiency_forward import (  # noqa: E402
     CbbEfficiencyForwardRunner, games_from_board, load_vintage,
@@ -117,7 +117,9 @@ def lines_issue(date: str, number: int | None) -> tuple[int | None, str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--date", default=datetime.now(CT).strftime("%Y-%m-%d"))
+    # Slate date = US Eastern calendar date (sportsedge.cbb_daily_card.SLATE_TZ),
+    # matching ESPN's scoreboard dates= query.
+    ap.add_argument("--date", default=datetime.now(SLATE_TZ).strftime("%Y-%m-%d"))
     ap.add_argument("--issue", type=int)
     ap.add_argument("--lines-file")
     ap.add_argument("--torvik-store", default="artifacts/torvik_store")
