@@ -32,7 +32,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sportsedge.cbb_daily_card import (  # noqa: E402
-    CT, SLATE_TZ, card_rows, fixtures_from_espn, render_card_markdown,
+    CT, SLATE_TZ, card_rows, fixtures_from_espn, price_by_ratings_date,
+    render_card_markdown,
 )
 from sportsedge.cbb_efficiency_forward import (  # noqa: E402
     CbbEfficiencyForwardRunner, games_from_board, load_vintage,
@@ -47,6 +48,10 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 TORVIK_URL = "https://barttorvik.com/{year}_team_results.csv"
 
 
+class SourceFetchError(RuntimeError):
+    """A public source refused or failed; named on the card, never bypassed."""
+
+
 def _get(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
@@ -54,7 +59,7 @@ def _get(url: str) -> bytes:
             return r.read()
     except urllib.error.HTTPError as exc:
         # Name the failing source on the issue instead of a bare traceback.
-        raise SystemExit(f"SOURCE_FETCH_FAILED: HTTP {exc.code} from {url}") from exc
+        raise SourceFetchError(f"SOURCE_FETCH_FAILED: HTTP {exc.code} from {url}") from exc
 
 
 def espn_events(date: str) -> list[dict]:
@@ -70,7 +75,6 @@ def season_year(date: str) -> int:
 
 
 CARD_TIME_NOTE = "CARD_TIME_PULL_NOT_MORNING_VINTAGE"
-
 
 def ensure_vintage(date: str, store: Path) -> tuple[Path, str]:
     """Return (store_dir, provenance label) for the date's ratings.
@@ -97,7 +101,11 @@ def ensure_vintage(date: str, store: Path) -> tuple[Path, str]:
     (d / f"{date}.csv").write_bytes(raw)
     (d / f"{date}.json").write_text(json.dumps({
         "url": url, "pulled_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "as_of_local_date": date, "bytes": len(raw),
+        "as_of_local_date": date,
+        # Actual CT calendar date of this pull (#3022): a card-time pull for
+        # ratings date D made on another CT date never claims to be D's pull.
+        "pulled_local_date_ct": now.astimezone(CT).strftime("%Y-%m-%d"),
+        "bytes": len(raw),
         "team_rows": raw.decode("utf-8").strip().count("\n"),
         "sha256": hashlib.sha256(raw).hexdigest(),
         "evidence_state": "verified-by-pull", "note": CARD_TIME_NOTE,
@@ -140,14 +148,19 @@ def main() -> int:
     else:
         number, title, body = lines_issue(a.date, a.issue)
     board = parse_cbb_lines(body, title=title).to_board_dict()
+    # a.date is the ET LISTING slate (ESPN dates=); ratings load per
+    # fixture CT date (#3022) and a missing ratings date refuses its games.
     fixtures, notes = fixtures_from_espn(board, espn_events(a.date), a.date)
-    store, vintage_note = ensure_vintage(a.date, Path(a.torvik_store))
-    vintage = load_vintage(a.date, store)
-    runner = CbbEfficiencyForwardRunner()
-    priced = runner.price_slate(a.date, games_from_board(board, fixtures),
-                                vintage=vintage, now=datetime.now(timezone.utc))
+
+    def vintage_for(ct_date: str):
+        store, note = ensure_vintage(ct_date, Path(a.torvik_store))
+        return load_vintage(ct_date, store), note
+
+    priced, vintage_notes = price_by_ratings_date(
+        CbbEfficiencyForwardRunner(), board, fixtures, games_from_board,
+        vintage_for, now=datetime.now(timezone.utc))
     rows = card_rows(priced, fixtures)
-    md = render_card_markdown(rows, a.date, priced, notes, vintage_note)
+    md = render_card_markdown(rows, a.date, priced, notes, " ".join(vintage_notes))
 
     out = Path("artifacts/cbb_card") / a.date
     out.mkdir(parents=True, exist_ok=True)

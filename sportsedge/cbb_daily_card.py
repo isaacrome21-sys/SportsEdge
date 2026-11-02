@@ -57,6 +57,14 @@ CT = ZoneInfo("America/Chicago")
 # 2026-27 opener (High Point vs Liberty, tip 12:00 AM ET Nov 2 = 11:00 PM
 # CT Nov 1) is therefore on slate 2026-11-02. Display times stay CT.
 SLATE_TZ = ZoneInfo("America/New_York")
+# Ratings as-of date (#3022): the admitted live Torvik route binds a game's
+# morning-of vintage to the game's AMERICA/CHICAGO date
+# (research/cbb_barttorvik_live_route_20261028/ADMISSION_RECORD.md s2). One
+# ET listing slate can therefore need two ratings dates: the 11:00 PM CT
+# Nov 1 opener (ET slate Nov 2) uses Nov 1 CT ratings; Nov 2 daytime games
+# use Nov 2 CT ratings. Each fixture carries both: listing_date (ET) and
+# slate_date (= the runner's CT ratings date).
+RATINGS_TZ = CT
 
 SCREEN_MAE = {"SPREAD": 8.899, "TOTAL": 13.812}
 SIGMA = {m: mae * math.sqrt(math.pi / 2) for m, mae in SCREEN_MAE.items()}
@@ -106,6 +114,14 @@ def _local_date(ev: dict) -> str | None:
     """The event's slate date: its US Eastern calendar date (SLATE_TZ)."""
     tip = parse_ts(str(ev.get("date", "")).replace("Z", "+00:00"))
     return tip.astimezone(SLATE_TZ).strftime("%Y-%m-%d") if tip and tip.tzinfo else None
+
+
+def ratings_date(tip: str) -> str:
+    """The runner's slate date for a fixture: the tip's CT calendar date."""
+    t = parse_ts(str(tip).replace("Z", "+00:00"))
+    if t is None or t.tzinfo is None:
+        raise ValueError(f"TIP_TIMESTAMP_INVALID:{tip}")
+    return t.astimezone(RATINGS_TZ).strftime("%Y-%m-%d")
 
 
 def fixtures_from_espn(board: dict, events: list[dict], slate_date: str) -> tuple[dict, list[str]]:
@@ -163,7 +179,8 @@ def fixtures_from_espn(board: dict, events: list[dict], slate_date: str) -> tupl
             "home_espn_id": str(teams["home"]["team"]["id"]),
             "neutral_site": bool(comp.get("neutralSite")),
             "tip_utc": ev["date"].replace("Z", "+00:00") if ev["date"].endswith("Z") else ev["date"],
-            "slate_date": slate_date,
+            "listing_date": slate_date,
+            "slate_date": ratings_date(ev["date"]),
             "display": f"{teams['away']['team'].get('shortDisplayName', g['away'])} @ "
                        f"{teams['home']['team'].get('shortDisplayName', g['home'])}",
         }
@@ -280,6 +297,45 @@ def card_rows(priced: dict, fixtures: dict) -> list[dict]:
                      "tip_utc": rec["tip_utc"], "row_id": rec["row_id"], **status})
     rows.sort(key=lambda r: -r["ev"] if r["ev"] is not None else float("inf"))
     return rows
+
+
+# ------------------------------------------------------------------ pricing
+def price_by_ratings_date(runner, board: dict, fixtures: dict, games_from_board,
+                          vintage_for, *, now) -> tuple[dict, list[str]]:
+    """Price an ET listing slate one CT ratings date at a time (#3022).
+
+    ``vintage_for(ct_date)`` returns (TorvikVintage, provenance note) or
+    raises; a group whose ratings cannot be loaded is REFUSED as a whole
+    (TORVIK_VINTAGE_UNAVAILABLE_FOR_RATINGS_DATE) -- never priced with
+    another date's ratings, never carried forward. Returns the merged
+    priced dict (records/refusals concatenated; priced_at = the LATEST
+    group clock, so freshness is judged conservatively) and the
+    per-ratings-date provenance notes."""
+    groups: dict[str, dict] = {}
+    for key, fx in fixtures.items():
+        groups.setdefault(fx["slate_date"], {})[key] = fx
+    merged = {"records": [], "refusals": [], "priced_at": None,
+              "counted": False, "ratings_dates": sorted(groups)}
+    notes: list[str] = []
+    for ct_date in sorted(groups):
+        group = groups[ct_date]
+        try:
+            vintage, note = vintage_for(ct_date)
+        except Exception as exc:  # noqa: BLE001 - fail closed per ratings date
+            notes.append(f"Ratings {ct_date} (CT): unavailable -- {str(exc)[:160]}")
+            merged["refusals"] += [{"espn_event_id": fx["espn_event_id"], "market": None,
+                                    "reason": f"TORVIK_VINTAGE_UNAVAILABLE_FOR_RATINGS_DATE {ct_date}"}
+                                   for fx in group.values()]
+            continue
+        notes.append(f"Ratings {ct_date} (CT): {note}")
+        priced = runner.price_slate(ct_date, games_from_board(board, group),
+                                    vintage=vintage, now=now)
+        merged["records"] += priced.get("records", [])
+        merged["refusals"] += priced.get("refusals", [])
+        at = priced.get("priced_at")
+        if at and (merged["priced_at"] is None or at > merged["priced_at"]):
+            merged["priced_at"] = at
+    return merged, notes
 
 
 # ------------------------------------------------------------------ render
