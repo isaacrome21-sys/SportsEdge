@@ -86,16 +86,23 @@ def _rec(market, gap, side, line, a=-110, b=-110, model=None, **over):
     return rec
 
 
+PRICED_AT = "2026-11-02T18:01:00+00:00"   # 60 s after the _rec captures
+
+
+def _P(*recs):
+    return {"priced_at": PRICED_AT, "records": list(recs)}
+
+
 def _fx():
     return fixtures_from_espn({"games": [{"away": "High Point Panthers", "home": "Liberty Flames"}]}, EVENTS, D)[0]
 
 
 def test_card_rows_ev_side_status_and_headline():
-    priced = {"records": [
+    priced = _P(
         _rec("SPREAD", -2.7, "AWAY", 7.5, a=-112, b=-108, model=4.8),
         _rec("TOTAL", -4.6, "UNDER", 155.5, a=-105, b=-115, model=150.9),
         {"classification": "PASSED"},
-    ]}
+    )
     rows = card_rows(priced, _fx())
     assert all(r["bucket"] == "HEADLINE" for r in rows) and rows[0]["ev"] >= rows[1]["ev"]
     total = next(r for r in rows if r["market"] == "TOTAL")
@@ -108,9 +115,9 @@ def test_card_rows_ev_side_status_and_headline():
 
 
 def test_r2_reviewer_repro_minus_200_and_49pct_never_headlines():
-    rows = card_rows({"records": [_rec("SPREAD", 30, "HOME", 5, b=-200, model=35)]}, _fx())
+    rows = card_rows(_P(_rec("SPREAD", 30, "HOME", 5, b=-200, model=35)), _fx())
     assert rows[0]["bucket"] == "EXCLUDED_PRICE_CAP"
-    rows = card_rows({"records": [_rec("SPREAD", 30, "HOME", 5, b=-110, model=35)]}, _fx())
+    rows = card_rows(_P(_rec("SPREAD", 30, "HOME", 5, b=-110, model=35)), _fx())
     assert rows[0]["ev"] >= 0.40 and rows[0]["bucket"] == "OVERCONFIDENCE"
     md = render_card_markdown(rows, D, {"records": [1]}, [], "v")
     assert "EV +" not in md.split("Too-good")[0]          # not headlined
@@ -125,14 +132,14 @@ def test_r2_self_declared_or_malformed_rows_are_refused():
         _rec("SPREAD", 3, "HOME", 1, model=4, engine_id="OTHER"),
         _rec("SPREAD", 3, "HOME", 1, model=4, side_a_captured_at=None),
     ]
-    rows = card_rows({"records": bad}, _fx())
+    rows = card_rows(_P(*bad), _fx())
     assert [r["bucket"] for r in rows] == ["REFUSED"] * 5
     assert {r["reason"] for r in rows} == {"PRICE_INVALID", "CARD_RECORD_INVALID",
                                           "CARD_RECORD_NOT_RUNNER_OUTPUT", "QUOTE_PROVENANCE_MISSING"}
 
 
 def test_below_floor_and_stars():
-    rows = card_rows({"records": [_rec("SPREAD", 2.2, "HOME", -1.0, a=-140, b=-140, model=1.2)]}, _fx())
+    rows = card_rows(_P(_rec("SPREAD", 2.2, "HOME", -1.0, a=-140, b=-140, model=1.2)), _fx())
     assert rows[0]["bucket"] == "BELOW_FLOOR"
     assert (stars(0.01), stars(0.05), stars(0.12), stars(0.2)) == (1, 2, 4, 5)
 
@@ -165,7 +172,22 @@ def test_r4_card_time_pull_keeps_its_label(tmp_path, monkeypatch):
 
 
 def test_card_json_is_strict_json_even_with_refusals():
-    rows = card_rows({"records": [_rec("SPREAD", 3, "HOME", 1, b=-1, model=4),
-                                  _rec("TOTAL", -4.6, "UNDER", 155.5, model=150.9)]}, _fx())
+    rows = card_rows(_P(_rec("SPREAD", 3, "HOME", 1, b=-1, model=4),
+                                  _rec("TOTAL", -4.6, "UNDER", 155.5, model=150.9)), _fx())
     json.loads(json.dumps(rows, allow_nan=False))
     assert rows[-1]["bucket"] == "REFUSED"
+
+
+def test_r6_canonical_180s_freshness_gate():
+    rec = _rec("TOTAL", -4.6, "UNDER", 155.5, a=-105, b=-115, model=150.9)
+    fresh = card_rows({"priced_at": "2026-11-02T18:03:00+00:00", "records": [rec]}, _fx())
+    assert fresh[0]["bucket"] == "HEADLINE"
+    stale = card_rows({"priced_at": "2026-11-02T18:03:01+00:00", "records": [rec]}, _fx())
+    assert stale[0]["bucket"] == "STALE_QUOTE" and stale[0]["freshness"]["code"] == "QUOTE_STALE_OVER_180S"
+    md = render_card_markdown(stale, D, {"records": [rec]}, [], "v")
+    assert "EV +" not in md and "repost fresh lines" in md and "QUOTE_STALE_OVER_180S" in md
+    one_side = card_rows({"priced_at": "2026-11-02T18:01:00+00:00",
+                          "records": [{**rec, "side_b_captured_at": "2026-11-02T17:50:00+00:00"}]}, _fx())
+    assert one_side[0]["bucket"] == "STALE_QUOTE"
+    unverified = card_rows({"records": [rec]}, _fx())
+    assert unverified[0]["bucket"] == "STALE_QUOTE"

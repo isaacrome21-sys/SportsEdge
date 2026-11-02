@@ -43,13 +43,13 @@ def test_end_to_end_card(tmp_path):
     assert notes == [] and list(fixtures) == ["High Point Panthers@Liberty Flames"]
     priced = CbbEfficiencyForwardRunner().price_slate(
         DATE, games_from_board(board, fixtures), vintage=_vintage(tmp_path),
-        now=datetime(2026, 11, 2, 20, 0, tzinfo=timezone.utc))
+        now=datetime(2026, 11, 2, 18, 1, tzinfo=timezone.utc))
     assert priced["counted"] is False and priced["refusals"] == []
     recs = {r["market"]: r for r in priced["records"]}
     assert set(recs) == {"SPREAD", "TOTAL"}
     rows = card_rows(priced, fixtures)
     for r in rows:
-        assert r["market"] in recs and r["bucket"] != "REFUSED"
+        assert r["market"] in recs and r["bucket"] not in ("REFUSED", "STALE_QUOTE")
         rec = recs[r["market"]]
         assert rec["classification"] == "PICKED"
     md = render_card_markdown(rows, DATE, priced, notes, "Ratings: test vintage.")

@@ -23,7 +23,10 @@ calibration.
 Placement uses the repo's adopted shared card-gate constants (imported
 from sportsedge.lane_a_card_gates, never copied): price shorter than
 -165 excluded; EV >= +40% to the overconfidence bucket (never
-headlined); EV >= +3% headlines; else not shown. Every row carries the
+headlined); EV >= +3% headlines; else not shown. Freshness uses the
+canonical shared bound (sportsedge.quote_freshness, 180 s): both sides'
+capture must be fresh at the runner's priced_at or the row is
+STALE_QUOTE and never headlined. Every row carries the
 priced record's status (counted / verified_play / freeze_state /
 label) in card JSON.
 """
@@ -36,6 +39,11 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sportsedge.cbb_torvik_efficiency_v1 import parse_ts, price_ok
+from sportsedge.quote_freshness import (
+    MAX_QUOTE_AGE_SECONDS,
+    QUOTE_FRESH,
+    check_quote_freshness,
+)
 from sportsedge.lane_a_card_gates import (
     HEADLINE_FLOOR_EV,
     OVERCONFIDENCE_EV,
@@ -212,8 +220,21 @@ def _admit(rec: dict) -> str | None:
     return None
 
 
+def _freshness(rec: dict, priced_at) -> dict:
+    """Worst of the two sides' canonical freshness at pricing time."""
+    now = parse_ts(priced_at) if priced_at else None
+    if now is None or now.tzinfo is None:
+        return {"code": "QUOTE_FRESHNESS_UNVERIFIED", "age_seconds": None,
+                "max_age_seconds": MAX_QUOTE_AGE_SECONDS}
+    checks = [check_quote_freshness(rec.get(k), now=now)
+              for k in ("side_a_captured_at", "side_b_captured_at")]
+    bad = [c for c in checks if c["code"] != QUOTE_FRESH]
+    return bad[0] if bad else max(checks, key=lambda c: c["age_seconds"])
+
+
 def card_rows(priced: dict, fixtures: dict) -> list[dict]:
     """All admitted PICKED rows with EV, bucketed by the shared gates:
+    STALE_QUOTE (capture older than 180 s at pricing, or unverified),
     HEADLINE (+3% <= EV < +40%, price no shorter than -165),
     OVERCONFIDENCE (EV >= +40%, never headlined), EXCLUDED_PRICE_CAP,
     BELOW_FLOOR, or REFUSED (failed admission). Sorted by EV."""
@@ -231,7 +252,10 @@ def card_rows(priced: dict, fixtures: dict) -> list[dict]:
         p = phi(abs(rec["gap"]) / SIGMA[rec["market"]])
         d = describe(rec, by_event.get(rec["espn_event_id"]))
         ev = p * payout(d["price"]) - (1 - p)
-        if d["price"] < PRICE_CAP_AMERICAN:
+        fresh = _freshness(rec, priced.get("priced_at"))
+        if fresh["code"] != QUOTE_FRESH:
+            bucket = "STALE_QUOTE"
+        elif d["price"] < PRICE_CAP_AMERICAN:
             bucket = "EXCLUDED_PRICE_CAP"
         elif ev >= OVERCONFIDENCE_EV:
             bucket = "OVERCONFIDENCE"
@@ -241,6 +265,7 @@ def card_rows(priced: dict, fixtures: dict) -> list[dict]:
             bucket = "BELOW_FLOOR"
         rows.append({**d, "bucket": bucket, "market": rec["market"], "gap": rec["gap"],
                      "win_prob_approx": p, "ev": ev, "stars": stars(ev),
+                     "freshness": fresh,
                      "tip_utc": rec["tip_utc"], "row_id": rec["row_id"], **status})
     rows.sort(key=lambda r: -r["ev"] if r["ev"] is not None else float("inf"))
     return rows
@@ -253,6 +278,8 @@ def render_card_markdown(rows: list[dict], slate_date: str, priced: dict,
     out = [f"## 🏀 CBB card — {slate_date}", ""]
     if not heads:
         out += ["No plays clear the pick rule (spread gap ≥ 2.2, total gap ≥ 3.5) and the card gates today."]
+    if any(r["bucket"] == "STALE_QUOTE" for r in rows):
+        out += [f"Lines older than {MAX_QUOTE_AGE_SECONDS}s when priced aren't headlined — repost fresh lines to price them."]
     for r in heads:
         tip = datetime.fromisoformat(r["tip_utc"]).astimezone(CT).strftime("%-I:%M %p")
         flame = "🔥 " if r["stars"] >= 4 else ""
@@ -273,6 +300,10 @@ def render_card_markdown(rows: list[dict], slate_date: str, priced: dict,
     skipped += [f"{r.get('row_id')}: {r['reason']}" for r in rows if r["bucket"] == "REFUSED"]
     skipped += [f"{r['pick']} ({r['price']:+d}): price shorter than {PRICE_CAP_AMERICAN}"
                 for r in rows if r["bucket"] == "EXCLUDED_PRICE_CAP"]
+    stale = [r for r in rows if r["bucket"] == "STALE_QUOTE"]
+    skipped += [f"{r['pick']} ({r['price']:+d}): {r['freshness']['code']}"
+                + (f" ({r['freshness']['age_seconds']:.0f}s old)" if r['freshness'].get('age_seconds') else "")
+                for r in stale]
     if skipped:
         out += ["", f"<details><summary>Not on card ({len(skipped)})</summary>", ""]
         out += [f"- {s}" for s in skipped] + ["", "</details>"]
