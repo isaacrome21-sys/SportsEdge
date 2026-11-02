@@ -8,8 +8,9 @@
 * Identity: ESPN's free public scoreboard (D1 group 50) + the admitted
   crosswalk inside the runner; Illinois colleges excluded by the runner.
 * Ratings: the morning-of Torvik vintage from --torvik-store
-  (<date>.csv + <date>.json). If absent, the live season file is pulled
-  now and stored with a manifest; the card says when it was pulled.
+  (<date>.csv + <date>.json). If absent, the live file is pulled into a
+  separate <store>_cardtime research store stamped
+  CARD_TIME_PULL_NOT_MORNING_VINTAGE; the card says which was used.
 * Pricing: CbbEfficiencyForwardRunner.price_slate (NON_COUNTED; the
   family is NOT FROZEN, so nothing counts).
 Outputs artifacts/cbb_card/<date>/{priced.json, card.json, card.md};
@@ -59,25 +60,40 @@ def season_year(date: str) -> int:
     return y + 1 if m >= 8 else y
 
 
-def ensure_vintage(date: str, store: Path) -> str:
-    """Use the stored morning vintage; else pull the live file now."""
-    csv_p, js_p = store / f"{date}.csv", store / f"{date}.json"
-    if csv_p.is_file() and js_p.is_file():
-        return "Ratings: morning Torvik pull."
-    store.mkdir(parents=True, exist_ok=True)
-    raw = _get(TORVIK_URL.format(year=season_year(date)))
+CARD_TIME_NOTE = "CARD_TIME_PULL_NOT_MORNING_VINTAGE"
+
+
+def ensure_vintage(date: str, store: Path) -> tuple[Path, str]:
+    """Return (store_dir, provenance label) for the date's ratings.
+
+    The admitted morning vintage in ``store`` is used when present and is
+    labeled from ITS OWN manifest. Otherwise the live file is pulled into
+    a SEPARATE research store (``<store>_cardtime``) whose manifest is
+    stamped CARD_TIME_PULL_NOT_MORNING_VINTAGE, so a card-time fetch can
+    never be read back later as a morning vintage or enter the admitted
+    store. Reuse of a card-time pull keeps its card-time label."""
+    for d in (store, Path(str(store) + "_cardtime")):
+        js = d / f"{date}.json"
+        if (d / f"{date}.csv").is_file() and js.is_file():
+            m = json.loads(js.read_text())
+            if m.get("note") == CARD_TIME_NOTE:
+                return d, f"Ratings: Torvik card-time pull {m.get('pulled_at_utc')} (not the morning vintage)."
+            if d == store:
+                return d, f"Ratings: morning Torvik vintage pulled {m.get('pulled_at_utc', '?')}."
+    d = Path(str(store) + "_cardtime")
+    d.mkdir(parents=True, exist_ok=True)
+    url = TORVIK_URL.format(year=season_year(date))
+    raw = _get(url)
     now = datetime.now(timezone.utc)
-    rows = raw.decode("utf-8").strip().count("\n")
-    csv_p.write_bytes(raw)
-    js_p.write_text(json.dumps({
-        "url": TORVIK_URL.format(year=season_year(date)),
-        "pulled_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "as_of_local_date": date, "bytes": len(raw), "team_rows": rows,
+    (d / f"{date}.csv").write_bytes(raw)
+    (d / f"{date}.json").write_text(json.dumps({
+        "url": url, "pulled_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "as_of_local_date": date, "bytes": len(raw),
+        "team_rows": raw.decode("utf-8").strip().count("\n"),
         "sha256": hashlib.sha256(raw).hexdigest(),
-        "evidence_state": "verified-by-pull",
-        "note": "card-time pull (not the scheduled morning vintage)",
+        "evidence_state": "verified-by-pull", "note": CARD_TIME_NOTE,
     }))
-    return f"Ratings: Torvik pulled {now.astimezone(CT):%-I:%M %p} CT (card-time pull)."
+    return d, f"Ratings: Torvik card-time pull {now.astimezone(CT):%-I:%M %p} CT (not the morning vintage)."
 
 
 def lines_issue(date: str, number: int | None) -> tuple[int | None, str, str]:
@@ -114,8 +130,8 @@ def main() -> int:
         number, title, body = lines_issue(a.date, a.issue)
     board = parse_cbb_lines(body, title=title).to_board_dict()
     fixtures, notes = fixtures_from_espn(board, espn_events(a.date), a.date)
-    vintage_note = ensure_vintage(a.date, Path(a.torvik_store))
-    vintage = load_vintage(a.date, a.torvik_store)
+    store, vintage_note = ensure_vintage(a.date, Path(a.torvik_store))
+    vintage = load_vintage(a.date, store)
     runner = CbbEfficiencyForwardRunner()
     priced = runner.price_slate(a.date, games_from_board(board, fixtures),
                                 vintage=vintage, now=datetime.now(timezone.utc))

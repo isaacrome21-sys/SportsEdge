@@ -12,11 +12,20 @@ Pipeline (NON_COUNTED; nothing here counts, freezes, or grants PLAY):
 Pure functions only; ``scripts/run_cbb_daily_card.py`` does the I/O.
 
 EV is a CARD presentation figure, not a preregistration term. The win
-probability of a designated side is Phi(|gap| / sigma), with sigma taken
-from the family's own design screen (attempt 4, PR #2891): pooled MAE
-8.899 (spread) and 13.812 (total) converted to a normal SD by
-MAE * sqrt(pi/2). That is the model's demonstrated historical error,
-not a fitted calibration of the forward season.
+probability of a designated side is APPROXIMATED as Phi(|gap| / sigma),
+ASSUMING centered Gaussian model error, with sigma derived from the
+family's design-screen pooled MAE (attempt 4, PR #2891: 8.899 spread,
+13.812 total; sigma = MAE * sqrt(pi/2)). This is an assumption, not
+calibration evidence for conditional win probabilities, least of all
+at extreme gaps; it stays research output pending independent
+calibration.
+
+Placement uses the repo's adopted shared card-gate constants (imported
+from sportsedge.lane_a_card_gates, never copied): price shorter than
+-165 excluded; EV >= +40% to the overconfidence bucket (never
+headlined); EV >= +3% headlines; else not shown. Every row carries the
+priced record's status (counted / verified_play / freeze_state /
+label) in card JSON.
 """
 
 from __future__ import annotations
@@ -25,6 +34,13 @@ import math
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+from sportsedge.cbb_torvik_efficiency_v1 import parse_ts, price_ok
+from sportsedge.lane_a_card_gates import (
+    HEADLINE_FLOOR_EV,
+    OVERCONFIDENCE_EV,
+    PRICE_CAP_AMERICAN,
+)
 
 CT = ZoneInfo("America/Chicago")
 
@@ -61,22 +77,52 @@ def _hit(dk_name: str, comp: dict) -> int:
     return 0
 
 
+def _sides(ev: dict):
+    comps = (ev.get("competitions") or [{}])[0].get("competitors") or []
+    away = next((c for c in comps if c.get("homeAway") == "away"), None)
+    home = next((c for c in comps if c.get("homeAway") == "home"), None)
+    return away, home
+
+
+def _local_date(ev: dict) -> str | None:
+    tip = parse_ts(str(ev.get("date", "")).replace("Z", "+00:00"))
+    return tip.astimezone(CT).strftime("%Y-%m-%d") if tip and tip.tzinfo else None
+
+
 def fixtures_from_espn(board: dict, events: list[dict], slate_date: str) -> tuple[dict, list[str]]:
     """Build the runners' fixture table keyed "AWAY@HOME" (DK display
-    names) from ESPN scoreboard events. A comment-carried ESPN event id
-    wins; otherwise the best unambiguous name match. Ambiguity or no
-    match leaves the game out (never priced) and is reported."""
+    names) from ESPN scoreboard events.
+
+    Fail-closed identity: only events whose local (CT) date is the slate
+    date are eligible. A comment-carried ESPN event id is honored ONLY
+    when that event's away AND home teams both corroborate the captured
+    names; a supplied id that is unknown, off-date, or names other teams
+    REFUSES the game (no silent fallback to a name match). Without an
+    id, the single best name match is used; ambiguity or no match
+    leaves the game out. Refused/skipped games are never priced."""
+    on_date = [ev for ev in events if _local_date(ev) == slate_date]
     by_id = {str(ev.get("id")): ev for ev in events}
     fixtures, notes = {}, []
     for g in board.get("games", []):
         key = f"{g['away']}@{g['home']}"
-        ev = by_id.get(str(g.get("espn_event_id"))) if g.get("espn_event_id") else None
-        if ev is None:
+        label = f"{g['away']} @ {g['home']}"
+        supplied = g.get("espn_event_id")
+        if supplied:
+            ev = by_id.get(str(supplied))
+            if ev is None:
+                notes.append(f"{label}: ESPN_EVENT_ID_UNKNOWN {supplied}, refused")
+                continue
+            if _local_date(ev) != slate_date:
+                notes.append(f"{label}: ESPN_EVENT_DATE_MISMATCH {supplied}, refused")
+                continue
+            away, home = _sides(ev)
+            if not away or not home or not (_hit(g["away"], away) and _hit(g["home"], home)):
+                notes.append(f"{label}: ESPN_EVENT_ID_TEAM_CONFLICT {supplied}, refused")
+                continue
+        else:
             scored = []
-            for cand in events:
-                comps = (cand.get("competitions") or [{}])[0].get("competitors") or []
-                away = next((c for c in comps if c.get("homeAway") == "away"), None)
-                home = next((c for c in comps if c.get("homeAway") == "home"), None)
+            for cand in on_date:
+                away, home = _sides(cand)
                 if not away or not home:
                     continue
                 s_a, s_h = _hit(g["away"], away), _hit(g["home"], home)
@@ -84,10 +130,10 @@ def fixtures_from_espn(board: dict, events: list[dict], slate_date: str) -> tupl
                     scored.append((s_a + s_h, cand))
             scored.sort(key=lambda t: -t[0])
             if not scored:
-                notes.append(f"{g['away']} @ {g['home']}: no ESPN game found")
+                notes.append(f"{label}: no ESPN game found on {slate_date}")
                 continue
             if len(scored) > 1 and scored[0][0] == scored[1][0]:
-                notes.append(f"{g['away']} @ {g['home']}: ambiguous ESPN match, skipped")
+                notes.append(f"{label}: ambiguous ESPN match, skipped")
                 continue
             ev = scored[0][1]
         comp = ev["competitions"][0]
@@ -145,43 +191,89 @@ def describe(rec: dict, fixture: dict | None) -> dict:
     return {"game": f"{away} @ {home}", "pick": text, "price": int(price), "why": why}
 
 
+STATUS_KEYS = ("counted", "verified_play", "freeze_state", "label", "engine_id")
+
+
+def _admit(rec: dict) -> str | None:
+    """Strict admission of a priced record onto a card; returns a
+    refusal code or None. Self-declared PICKED is never enough."""
+    if rec.get("engine_id") != "CBB_TORVIK_EFFICIENCY_V1" or rec.get("counted") is not False:
+        return "CARD_RECORD_NOT_RUNNER_OUTPUT"
+    if rec.get("market") not in SIGMA or rec.get("designated_side") is None:
+        return "CARD_RECORD_INVALID"
+    gap = rec.get("gap")
+    if isinstance(gap, bool) or not isinstance(gap, (int, float)) or not math.isfinite(gap):
+        return "CARD_RECORD_INVALID"
+    if not (price_ok(rec.get("side_a_price")) and price_ok(rec.get("side_b_price"))):
+        return "PRICE_INVALID"
+    if not (rec.get("side_a_captured_at") and rec.get("side_b_captured_at")
+            and rec.get("capture_source")):
+        return "QUOTE_PROVENANCE_MISSING"
+    return None
+
+
 def card_rows(priced: dict, fixtures: dict) -> list[dict]:
+    """All admitted PICKED rows with EV, bucketed by the shared gates:
+    HEADLINE (+3% <= EV < +40%, price no shorter than -165),
+    OVERCONFIDENCE (EV >= +40%, never headlined), EXCLUDED_PRICE_CAP,
+    BELOW_FLOOR, or REFUSED (failed admission). Sorted by EV."""
     by_event = {f["espn_event_id"]: f for f in fixtures.values()}
     rows = []
     for rec in priced.get("records", []):
         if rec.get("classification") != "PICKED":
             continue
+        status = {k: rec.get(k) for k in STATUS_KEYS}
+        refusal = _admit(rec)
+        if refusal:
+            rows.append({"bucket": "REFUSED", "reason": refusal,
+                         "row_id": rec.get("row_id"), "ev": None, **status})
+            continue
         p = phi(abs(rec["gap"]) / SIGMA[rec["market"]])
         d = describe(rec, by_event.get(rec["espn_event_id"]))
         ev = p * payout(d["price"]) - (1 - p)
-        if ev <= 0:
-            continue
-        rows.append({**d, "market": rec["market"], "gap": rec["gap"],
-                     "win_prob": p, "ev": ev, "stars": stars(ev),
-                     "tip_utc": rec["tip_utc"], "row_id": rec["row_id"]})
-    rows.sort(key=lambda r: -r["ev"])
+        if d["price"] < PRICE_CAP_AMERICAN:
+            bucket = "EXCLUDED_PRICE_CAP"
+        elif ev >= OVERCONFIDENCE_EV:
+            bucket = "OVERCONFIDENCE"
+        elif ev >= HEADLINE_FLOOR_EV:
+            bucket = "HEADLINE"
+        else:
+            bucket = "BELOW_FLOOR"
+        rows.append({**d, "bucket": bucket, "market": rec["market"], "gap": rec["gap"],
+                     "win_prob_approx": p, "ev": ev, "stars": stars(ev),
+                     "tip_utc": rec["tip_utc"], "row_id": rec["row_id"], **status})
+    rows.sort(key=lambda r: -r["ev"] if r["ev"] is not None else float("inf"))
     return rows
 
 
 # ------------------------------------------------------------------ render
 def render_card_markdown(rows: list[dict], slate_date: str, priced: dict,
                          notes: list[str], vintage_note: str) -> str:
+    heads = [r for r in rows if r["bucket"] == "HEADLINE"]
     out = [f"## 🏀 CBB card — {slate_date}", ""]
-    if not rows:
-        out += ["No plays clear the pick rule today (spread gap ≥ 2.2, total gap ≥ 3.5) with positive EV."]
-    for r in rows:
+    if not heads:
+        out += ["No plays clear the pick rule (spread gap ≥ 2.2, total gap ≥ 3.5) and the card gates today."]
+    for r in heads:
         tip = datetime.fromisoformat(r["tip_utc"]).astimezone(CT).strftime("%-I:%M %p")
         flame = "🔥 " if r["stars"] >= 4 else ""
         out.append(f"{flame}**{r['pick']}** ({r['price']:+d}) · EV {r['ev']:+.1%} · "
                    f"{'★' * r['stars']}{'☆' * (5 - r['stars'])}")
-        out.append(f"  {r['game']} · {tip} CT · {r['why']} · win {r['win_prob']:.0%}")
+        out.append(f"  {r['game']} · {tip} CT · {r['why']}")
+    quarantined = [r for r in rows if r["bucket"] == "OVERCONFIDENCE"]
+    if quarantined:
+        out += ["", "⚠️ Too-good-to-be-true (EV ≥ 40%, not headlined — check the line and injuries):"]
+        out += [f"- {r['pick']} ({r['price']:+d}) · {r['game']}" for r in quarantined]
     n_rec = len(priced.get("records", []))
-    out += ["", f"Priced {n_rec} lines; {len(rows)} plays. {vintage_note}",
-            "EV uses the model's historical error (spread σ "
-            f"{SIGMA['SPREAD']:.1f}, total σ {SIGMA['TOTAL']:.1f} pts). 21+ · bet small."]
+    out += ["", f"Priced {n_rec} lines; {len(heads)} plays. {vintage_note}",
+            "EV approximates win chance from the model's average historical miss "
+            f"(spread σ {SIGMA['SPREAD']:.1f}, total σ {SIGMA['TOTAL']:.1f} pts), "
+            "assuming normal errors. 21+."]
     skipped = [f"{r.get('market') or 'game'} {r['espn_event_id']}: {r['reason']}"
                for r in priced.get("refusals", [])] + notes
+    skipped += [f"{r.get('row_id')}: {r['reason']}" for r in rows if r["bucket"] == "REFUSED"]
+    skipped += [f"{r['pick']} ({r['price']:+d}): price shorter than {PRICE_CAP_AMERICAN}"
+                for r in rows if r["bucket"] == "EXCLUDED_PRICE_CAP"]
     if skipped:
-        out += ["", f"<details><summary>Not priced ({len(skipped)})</summary>", ""]
+        out += ["", f"<details><summary>Not on card ({len(skipped)})</summary>", ""]
         out += [f"- {s}" for s in skipped] + ["", "</details>"]
     return "\n".join(out) + "\n"
