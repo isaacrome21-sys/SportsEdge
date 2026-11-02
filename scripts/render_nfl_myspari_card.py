@@ -115,6 +115,12 @@ NO_MODEL_TEXT = {
     NO_MODEL_MARKET: "no pick: market not modeled",
     "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE": "no research price: fresh paired lines, future kickoff and prior history required",
     "NO_MODEL:PAIRED_RESIDUAL_PRICE_UNAVAILABLE": "no research price: both sides and market anchor required",
+    "NO_MODEL:QB_HOLD": "QB HOLD: no model price",
+}
+
+QB_HOLD_TEXT = {
+    "NO_LEAN:QB_CHANGE_UNMODELED": "QB HOLD: the QB on this board differs from the QB the model was built on; no model price shown",
+    "NO_LEAN:QB_STARTER_UNVERIFIED": "QB HOLD: QB not established (ESPN depth chart QB1 + injury report, provisional); no model price shown",
 }
 
 
@@ -190,12 +196,12 @@ def why_lines(game: dict) -> list[str]:
         row = (check.get("teams") or {}).get(team) or {}
         st = row.get("starter") or {}
         if row.get("verdict") == "QB_CHANGE":
-            out.append(f"- QB change ({team}): confirmed starter {st.get('name')} ({st.get('source')}, {str(st.get('retrieved_at'))[:16]})"
-                       f" but the model was built on {row.get('model_qb')}. No lean on this game.")
+            out.append(f"- QB change ({team}): ESPN depth-chart QB1 {st.get('name')} ({st.get('source')}, {str(st.get('retrieved_at'))[:16]}, provisional)"
+                       f"; the model was built on {row.get('model_qb')}. QB HOLD: no model price on this game.")
         elif row.get("verdict") and row.get("verdict") != "MATCH":
-            out.append(f"- QB not confirmed ({team}): {row['verdict']}. No lean on this game.")
+            out.append(f"- QB not established ({team}): {row['verdict']}. QB HOLD: no model price on this game.")
     for c in (check.get("prop_corroboration") or {}).get("conflicts") or []:
-        out.append(f"- QB prop conflict: {c['player']} ({c['code']}). No lean on this game.")
+        out.append(f"- QB prop conflict: {c['player']} ({c['code']}). QB HOLD: no model price on this game.")
     if out:
         out.insert(0, "Why (from " + ", ".join(ctx.get("sources") or ["retrieved data"]) + "):")
         inj = (ctx.get("game_info") or {}).get("injuries")
@@ -231,6 +237,9 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 team_totals.append(f"  - {label}")
                 continue
             reason = row.get("no_model") if row.get("residual_mode") else (row.get("no_model") or market_eligibility(row.get("market"), row.get("line")))
+            if reason == "NO_MODEL:QB_HOLD":
+                unpriced.append(f"- {label}: {QB_HOLD_TEXT.get(row.get('qb_hold'), 'QB HOLD: no model price shown')}")
+                continue
             if reason:
                 unpriced.append(f"- {label}: {_plain_reason(reason, row.get('residual_research_error'))}")
                 continue
