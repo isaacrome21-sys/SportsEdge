@@ -40,6 +40,8 @@ def _ticket(total: dict | None = None) -> dict:
                      "raw": "TeamTotal Ravens 10.5 -110 -110", "team": "BAL", "player": None},
                     {"market": "pass_yards", "line": 245.5, "away_or_over_price": -110, "home_or_under_price": -110,
                      "raw": 'Prop "Lamar Jackson" PassYards 245.5 -110 -110', "team": None, "player": "Lamar Jackson"},
+                    {"market": "pass_yards", "line": 265.5, "away_or_over_price": -110, "home_or_under_price": -110,
+                     "raw": 'Prop "Patrick Mahomes" PassYards 265.5 -110 -110', "team": None, "player": "Patrick Mahomes"},
                 ],
             }
         ],
@@ -50,16 +52,46 @@ def _ticket(total: dict | None = None) -> dict:
     return ticket
 
 
+def _starters(teams: dict | None = None, retrieved_at: str = "2026-09-20T15:00:00Z") -> dict:
+    """Authoritative-starter fixture (same shape fetch_espn_starters returns)."""
+    teams = teams if teams is not None else {"KC": "Patrick Mahomes", "BAL": "Lamar Jackson"}
+    return {"source": "TEST_FIXTURE", "retrieved_at": retrieved_at,
+            "teams": {t: (v if isinstance(v, dict) else
+                          {"names": [v], "injury_report_checked": True, "injury_status": ""})
+                      for t, v in teams.items()}}
+
+
+_DEFAULT = object()
+
+
 class NflCardLeanTests(unittest.TestCase):
-    def _run(self, history: list[dict] | None = None, total: dict | None = None) -> tuple[dict, str]:
+    def _run(self, history: list[dict] | None = None, total: dict | None = None,
+             drop_player: str | None = None, starters: object = _DEFAULT,
+             props: list[dict] | None = None) -> tuple[dict, str]:
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
-            (t / "ticket.json").write_text(json.dumps(_ticket(total)), encoding="utf-8")
+            ticket = _ticket(total)
+            if drop_player:
+                for g in ticket["games"]:
+                    g["markets"] = [m for m in g["markets"] if m.get("player") != drop_player]
+            if props is not None:
+                for g in ticket["games"]:
+                    g["markets"] = [m for m in g["markets"] if not m.get("player")] + [
+                        {"market": "pass_yards", "line": 250.5, "away_or_over_price": -110,
+                         "home_or_under_price": -110, "raw": f'Prop "{p["player"]}" PassYards 250.5 -110 -110',
+                         "quote_retrieved_at": ticket["observed_at"], **p} for p in props]
+            (t / "ticket.json").write_text(json.dumps(ticket), encoding="utf-8")
             (t / "hist.json").write_text(json.dumps(_history() if history is None else history), encoding="utf-8")
             env = {"PYTHONPATH": str(ROOT)}
+            extra = []
+            if starters is _DEFAULT:
+                starters = _starters()
+            if starters is not None:
+                (t / "starters.json").write_text(json.dumps(starters), encoding="utf-8")
+                extra = ["--starters", str(t / "starters.json")]
             subprocess.run(
                 [sys.executable, "scripts/run_nfl_lines_card.py", "--input", str(t / "ticket.json"),
-                 "--history", str(t / "hist.json"), "--output", str(t / "card.json")],
+                 "--history", str(t / "hist.json"), "--output", str(t / "card.json"), *extra],
                 cwd=ROOT, env=env, check=True,
             )
             subprocess.run(
@@ -146,23 +178,293 @@ class NflCardLeanTests(unittest.TestCase):
         self.assertIn("Model (Attempt 9): total", md)
         self.assertIn("Last listed starting QB (nflverse): KC Patrick Mahomes", md)
         self.assertIn("Injuries/inactives: not checked", md)
-        # Lamar has a passing prop and is BAL's last starter: no QB-change flag.
-        self.assertNotIn("QB check", md)
+        # Both confirmed starters match the model's QBs: no QB lines.
+        self.assertNotIn("QB change", md)
+        self.assertNotIn("QB not confirmed", md)
 
-    def test_qb_change_flag_when_prop_qb_is_not_last_starter(self):
+    # ---- #3017 legacy-route QB safeguard (review 5731129764) ----
+
+    def _mains(self, engine):
+        mains = [m for m in engine["games"][0]["markets"] if m.get("residual_mode")]
+        self.assertTrue(mains)
+        return mains
+
+    def _assert_all_blocked(self, engine, code, md=None):
+        """Review 5731213002: a held game shows NO QB-sensitive model output."""
+        game = engine["games"][0]
+        mains = [m for m in game["markets"] if m["market"] in {"moneyline", "spread", "total"}]
+        self.assertTrue(mains)
+        for m in mains:
+            self.assertEqual(m["no_model"], "NO_MODEL:QB_HOLD")
+            self.assertEqual(m["qb_hold"], code)
+            for k in ("lean", "residual_research_prices", "residual_research_adjustment", "pick"):
+                self.assertIsNone(m.get(k))
+        self.assertEqual(game["leans"], [])
+        self.assertEqual(game["residual_research_prices"], [])
+        self.assertNotIn("projection", game["context"])
+        if md is not None:
+            self.assertNotRegex(md, r"research EV [+-]\d")
+            self.assertNotIn("Model (Attempt 9)", md)
+            self.assertIn("QB HOLD", md)
+
+    def test_confirmed_starters_match_model_no_block(self):
+        engine, md = self._run()
+        self.assertIsNone(engine["games"][0]["context"]["qb_check"]["block"])
+        for m in self._mains(engine):
+            self.assertIsNone(m["lean_block"])
+        self.assertRegex(md, r"research EV [+-]\d")
+        self.assertNotIn("QB HOLD", md)
+
+    def test_snf_3015_board_mckee_vs_model_hurts_is_held_with_no_model_price(self):
+        """Exact #3015 evidence: nflverse last starter Jalen Hurts (model),
+        DK board QB props Tanner McKee (PHI) and Jayden Daniels (WAS)."""
+        hist = []
+        for i in range(8):
+            day = f"2026-10-{i + 1:02d}"
+            hist.append({"date": day, "id": f"p{i}", "home": "PHI", "away": "DAL", "hs": 24, "as": 20,
+                         "home_qb": "Jalen Hurts", "away_qb": "Dak Prescott"})
+            hist.append({"date": day, "id": f"w{i}", "home": "WAS", "away": "NYG", "hs": 23, "as": 17,
+                         "home_qb": "Jayden Daniels", "away_qb": "Jaxson Dart"})
+        ticket = {"slate": "2026-11-01", "observed_at": "2026-11-02T00:34:50Z", "games": [{
+            "home": "WAS", "away": "PHI", "commence_time": "2026-11-02T01:20:00Z", "markets": [
+                {"market": "moneyline", "line": None, "away_or_over_price": 225, "home_or_under_price": -278, "raw": "ML +225 -278"},
+                {"market": "spread", "line": 6.0, "away_or_over_price": -108, "home_or_under_price": -112, "raw": "Spread +6 -108 -112"},
+                {"market": "total", "line": 40.5, "away_or_over_price": -110, "home_or_under_price": -110, "raw": "Total 40.5 -110 -110"},
+                {"market": "passing_yards", "line": 206.5, "away_or_over_price": -112, "home_or_under_price": -112,
+                 "raw": 'Prop "Tanner McKee" PassYards 206.5 -112 -112', "team": None, "player": "Tanner McKee"},
+                {"market": "passing_yards", "line": 202.5, "away_or_over_price": -112, "home_or_under_price": -112,
+                 "raw": 'Prop "Jayden Daniels" PassYards 202.5 -112 -112', "team": None, "player": "Jayden Daniels"},
+            ]}]}
+        for m in ticket["games"][0]["markets"]:
+            m["quote_retrieved_at"] = ticket["observed_at"]
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            (t / "ticket.json").write_text(json.dumps(ticket), encoding="utf-8")
+            (t / "hist.json").write_text(json.dumps(hist), encoding="utf-8")
+            env = {"PYTHONPATH": str(ROOT)}
+            # No starter source at all: the board alone must hold the game.
+            subprocess.run([sys.executable, "scripts/run_nfl_lines_card.py", "--input", str(t / "ticket.json"),
+                            "--history", str(t / "hist.json"), "--output", str(t / "card.json")],
+                           cwd=ROOT, env=env, check=True)
+            subprocess.run([sys.executable, "scripts/render_nfl_myspari_card.py", "--engine-output", str(t / "card.json"),
+                            "--snapshot", str(t / "ticket.json"), "--pre-context", "--out-dir", str(t / "out")],
+                           cwd=ROOT, env=env, check=True)
+            engine = json.loads((t / "card.json").read_text())
+            md = (t / "out" / "card.md").read_text()
+        check = engine["games"][0]["context"]["qb_check"]
+        self.assertEqual(check["block"], "CHANGE")
+        self.assertIn({"player": "Tanner McKee", "code": "PROP_QB_DIFFERS_FROM_MODEL_QB"},
+                      check["prop_corroboration"]["conflicts"])
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED", md)
+        self.assertIn("QB prop conflict: Tanner McKee", md)
+        self.assertNotIn("45.", md.split("Both sides")[0])         # no stale projected total
+        self.assertIn("ML PHI +225 / WAS -278", md)                 # DK quotes kept as record
+
+    def test_confirmed_starter_differs_from_model_qb_blocks_change(self):
+        engine, md = self._run(starters=_starters({"KC": "Patrick Mahomes", "BAL": "Tyler Huntley"}))
+        self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["BAL"]["verdict"], "QB_CHANGE")
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED", md)
+        self.assertIn("QB change (BAL): ESPN depth-chart QB1 Tyler Huntley", md)
+        self.assertIn("built on Lamar Jackson", md)
+
+    def test_no_starter_source_fails_closed(self):
+        engine, md = self._run(starters=None)
+        self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"],
+                         "STARTER_SOURCE_UNAVAILABLE")
+        self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+        self.assertIn("QB not established", md)
+
+    def test_props_alone_never_confirm_a_starter(self):
+        # Both QBs have DK props (default ticket) but no authoritative source.
+        engine, _ = self._run(starters=None)
+        corr = engine["games"][0]["context"]["qb_check"]["prop_corroboration"]
+        self.assertEqual(corr["teams"], {})
+        self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+
+    def test_absent_confirmed_starter_for_one_team_blocks(self):
+        engine, _ = self._run(starters=_starters({"BAL": "Lamar Jackson"}))
+        self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"],
+                         "STARTER_TEAM_MISSING")
+        self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+
+    def test_same_surname_qbs_on_opposite_teams_detects_change(self):
+        # Old surname pooling: "Jackson" prop for KC's backup matched BAL's
+        # Lamar Jackson and passed. Team-bound full names must catch it.
+        engine, _ = self._run(
+            starters=_starters({"KC": "Desmond Jackson", "BAL": "Lamar Jackson"}),
+            props=[{"player": "Lamar Jackson", "team": "BAL"}, {"player": "Desmond Jackson", "team": "KC"}])
+        teams = engine["games"][0]["context"]["qb_check"]["teams"]
+        self.assertEqual((teams["KC"]["verdict"], teams["BAL"]["verdict"]), ("QB_CHANGE", "MATCH"))
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED")
+
+    def test_same_surname_model_qb_is_not_a_match(self):
+        hist = _history()
+        for g in hist:
+            if g["home"] == "KC":
+                g["home_qb"] = "Shane Jackson"
+        engine, _ = self._run(hist, starters=_starters({"KC": "Patrick Mahomes", "BAL": "Lamar Jackson"}))
+        self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"], "QB_CHANGE")
+
+    def test_prop_assigned_to_wrong_team_blocks(self):
+        engine, md = self._run(props=[{"player": "Patrick Mahomes", "team": "BAL"},
+                                      {"player": "Lamar Jackson", "team": "BAL"}])
+        conflicts = engine["games"][0]["context"]["qb_check"]["prop_corroboration"]["conflicts"]
+        self.assertEqual(conflicts, [{"player": "Patrick Mahomes", "code": "PROP_TEAM_CONFLICT"}])
+        self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+        self.assertIn("QB prop conflict: Patrick Mahomes", md)
+
+    def test_prop_for_a_qb_who_is_neither_starter_blocks(self):
+        engine, _ = self._run(props=[{"player": "Patrick Mahomes", "team": None},
+                                     {"player": "Lamar Jackson", "team": None},
+                                     {"player": "Tyler Huntley", "team": None}])
+        conflicts = engine["games"][0]["context"]["qb_check"]["prop_corroboration"]["conflicts"]
+        self.assertEqual([c["code"] for c in conflicts],
+                         ["PROP_QB_NOT_A_CONFIRMED_STARTER", "PROP_QB_DIFFERS_FROM_MODEL_QB"])
+        self._assert_all_blocked(engine, "NO_LEAN:QB_CHANGE_UNMODELED")
+
+    def test_ambiguous_or_surname_only_starter_rejected(self):
+        for kc in ({"names": ["Patrick Mahomes", "Carson Wentz"], "injury_report_checked": True},
+                   {"names": ["Mahomes"], "injury_report_checked": True}):
+            engine, _ = self._run(starters=_starters({"KC": kc, "BAL": "Lamar Jackson"}))
+            self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"],
+                             "STARTER_NAME_AMBIGUOUS")
+            self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+
+    def test_stale_or_untimestamped_starter_source_blocks(self):
+        for doc, code in ((_starters(retrieved_at="2026-09-19T15:00:00Z"), "STARTER_STALE"),
+                          (_starters(retrieved_at="2026-09-20T17:00:00Z"), "STARTER_STALE"),
+                          ({**_starters(), "retrieved_at": None}, "STARTER_TIMESTAMP_MISSING")):
+            engine, _ = self._run(starters=doc)
+            self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"], code)
+            self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+
+    def test_starter_on_injury_report_or_unchecked_report_blocks(self):
+        for kc, code in (({"names": ["Patrick Mahomes"], "injury_report_checked": True,
+                           "injury_status": "Questionable"}, "STARTER_INJURY_LISTED"),
+                         ({"names": ["Patrick Mahomes"]}, "STARTER_SOURCE_UNAVAILABLE")):
+            engine, _ = self._run(starters=_starters({"KC": kc, "BAL": "Lamar Jackson"}))
+            self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["KC"]["verdict"], code)
+            self._assert_all_blocked(engine, "NO_LEAN:QB_STARTER_UNVERIFIED")
+
+    def test_suffix_and_accent_normalized_full_name_matches(self):
         hist = _history()
         for g in hist:
             if g["home"] == "BAL":
-                g["home_qb"] = "Tyler Huntley"
-        engine, md = self._run(hist)
-        self.assertEqual(engine["games"][0]["context"]["qb_change_flag"], ["Lamar Jackson"])
-        self.assertIn("QB check: DK has passing props for Lamar Jackson", md)
+                g["home_qb"] = "Lamar Jackson Jr."
+        engine, _ = self._run(hist)
+        self.assertEqual(engine["games"][0]["context"]["qb_check"]["teams"]["BAL"]["verdict"], "MATCH")
+
+    def test_qb_unverified_blocks_without_history(self):
+        engine, _ = self._run([])
+        for m in engine["games"][0]["markets"]:
+            if m.get("residual_mode"):
+                self.assertIsNone(m["lean"])
 
     def test_no_why_section_without_history_facts(self):
         _, md = self._run([])
         self.assertNotIn("Why (", md)
         self.assertNotIn("Injuries", md)
         self.assertNotIn("starting QB", md)
+
+
+class NflEspnStarterFetchTests(unittest.TestCase):
+    """fetch_espn_starters against canned ESPN payloads (no network)."""
+
+    def _getter(self, *, kc_depth=None, injuries=None, summary=None, fail=()):
+        from sportsedge.nfl_qb_starter_check import ESPN_BASE
+        board = {"events": [{"id": "e1", "competitions": [{"competitors": [
+            {"homeAway": "away", "team": {"id": "12", "abbreviation": "KC"}},
+            {"homeAway": "home", "team": {"id": "33", "abbreviation": "BAL"}}]}]}]}
+        def depth(name, aid):
+            return {"depthchart": [{"name": "Base", "positions": {"qb": {"athletes": [
+                {"id": aid, "displayName": name}, {"id": "9", "displayName": "Backup Guy"}]}}}]}
+        pages = {
+            f"{ESPN_BASE}/summary?event=e1": summary if summary is not None else {"injuries": injuries if injuries is not None else [
+                {"team": {"id": "12", "abbreviation": "KC"}, "injuries": []},
+                {"team": {"id": "33", "abbreviation": "BAL"}, "injuries": []}]},
+            f"{ESPN_BASE}/teams/12/depthcharts": kc_depth or depth("Patrick Mahomes", "3139477"),
+            f"{ESPN_BASE}/teams/33/depthcharts": depth("Lamar Jackson", "3916387"),
+        }
+        def get(url):
+            if any(f in url for f in fail):
+                raise OSError("down")
+            if "scoreboard" in url:
+                return board
+            return pages[url]
+        return get
+
+    def _fetch(self, **kw):
+        from datetime import date, datetime, timezone
+        from sportsedge.nfl_qb_starter_check import fetch_espn_starters
+        return fetch_espn_starters([{"away": "KC", "home": "BAL"}], date(2026, 9, 20), getter=self._getter(**kw),
+                                   now=datetime(2026, 9, 20, 15, tzinfo=timezone.utc))
+
+    def test_depth_chart_qb1_with_clean_injury_report_confirms(self):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        doc = self._fetch()
+        r = resolve_starter(doc, "KC", "2026-09-20T16:00:00Z")
+        self.assertEqual((r["status"], r["name"], r["athlete_id"]), ("CONFIRMED", "Patrick Mahomes", "3139477"))
+        self.assertEqual(doc["retrieved_at"], "2026-09-20T15:00:00+00:00")
+
+    def test_qb1_out_on_injury_report_is_not_confirmed(self):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        doc = self._fetch(injuries=[{"team": {"id": "12"}, "injuries": [
+            {"athlete": {"id": "3139477"}, "status": "Out"}]}, {"team": {"id": "33"}, "injuries": []}])
+        self.assertEqual(resolve_starter(doc, "KC", "2026-09-20T16:00:00Z")["status"], "STARTER_INJURY_LISTED")
+
+    def test_conflicting_qb1_across_formations_is_ambiguous(self):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        kc = {"depthchart": [
+            {"positions": {"qb": {"athletes": [{"id": "1", "displayName": "Patrick Mahomes"}]}}},
+            {"positions": {"qb": {"athletes": [{"id": "2", "displayName": "Carson Wentz"}]}}}]}
+        doc = self._fetch(kc_depth=kc)
+        self.assertEqual(resolve_starter(doc, "KC", "2026-09-20T16:00:00Z")["status"], "STARTER_NAME_AMBIGUOUS")
+
+    def test_fetch_failures_fail_closed(self):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        doc = self._fetch(fail=("teams/12/depthcharts",))
+        self.assertEqual(resolve_starter(doc, "KC", "2026-09-20T16:00:00Z")["status"], "STARTER_TEAM_MISSING")
+        doc = self._fetch(fail=("summary",))
+        self.assertEqual(resolve_starter(doc, "BAL", "2026-09-20T16:00:00Z")["status"], "STARTER_SOURCE_UNAVAILABLE")
+        doc = self._fetch(fail=("scoreboard",))
+        self.assertEqual(resolve_starter(doc, "BAL", "2026-09-20T16:00:00Z")["status"], "STARTER_TEAM_MISSING")
+
+    # Review 5731270304: a summary without a valid injury report must HOLD.
+    def _status(self, team="KC", **kw):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        return resolve_starter(self._fetch(**kw), team, "2026-09-20T16:00:00Z")["status"]
+
+    def test_summary_without_injuries_field_holds(self):
+        self.assertEqual(self._status(summary={"header": {}}), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", summary={}), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_empty_injury_list_holds_both_teams(self):
+        self.assertEqual(self._status(injuries=[]), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", injuries=[]), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_report_missing_one_team_holds_only_that_team(self):
+        inj = [{"team": {"id": "33", "abbreviation": "BAL"}, "injuries": []}]
+        self.assertEqual(self._status(injuries=inj), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", injuries=inj), "CONFIRMED")
+
+    def test_malformed_injury_report_holds(self):
+        bad = [
+            {"injuries": "n/a"},
+            {"injuries": [None]},
+            {"injuries": [{"injuries": []}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": "x"}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": [{"athlete": {}, "status": "Out"}]}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": [{"athlete": {"id": "3139477"}}]}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": []}, {"team": {"id": "12"}, "injuries": []}]},
+        ]
+        for summary in bad:
+            with self.subTest(summary=summary):
+                self.assertEqual(self._status(summary=summary), "STARTER_SOURCE_UNAVAILABLE")
+                self.assertEqual(self._status(team="BAL", summary=summary), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_report_errors_are_recorded(self):
+        doc = self._fetch(summary={})
+        self.assertTrue(any("INJURY_REPORT_ABSENT" in e for e in doc["errors"]))
 
 
 class NflHistoryTeamAliasTests(unittest.TestCase):

@@ -20,6 +20,7 @@ from sportsedge.nfl_attempt9_live_forecast import (
     raw_forecasts,
     recency_features,
 )
+from sportsedge.nfl_qb_starter_check import fetch_espn_starters, qb_check
 from sportsedge.nfl_run_it_scoring import qualification_role_score
 from sportsedge.sports.nfl.market_anchored_residual import (
     ResidualQuoteError, load_frozen_policy, price_game,
@@ -49,6 +50,17 @@ def _ev(estimate_p: float, price: int) -> float:
 MIN_CALIBRATION_BLOCK_WEIGHT = 20
 LEAN_BLOCK_THIN = "NO_LEAN:THIN_CALIBRATION"
 LEAN_BLOCK_DIRECTION = "NO_LEAN:PROJECTION_DISAGREES"
+# LEGACY-ROUTE SAFEGUARD (relay #2447, owner rule Nov 1 2026). The frozen
+# Attempt 9 features describe each team under its LAST LISTED starter
+# (nflverse). Side/total/ML leans are blocked when that QB differs from the
+# confirmed starter (CHANGE) or when the starter cannot be verified from an
+# authoritative, timestamped source (UNVERIFIED). Starter source:
+# sportsedge.nfl_qb_starter_check (ESPN depth chart QB1 + injury report, or
+# --starters JSON). DK props are prop corroboration only and never confirm a
+# starter. No scoring adjustment is ever invented. run_it_full is untouched.
+LEAN_BLOCK_QB_CHANGE = "NO_LEAN:QB_CHANGE_UNMODELED"
+LEAN_BLOCK_QB_UNVERIFIED = "NO_LEAN:QB_STARTER_UNVERIFIED"
+QB_HOLD_NO_MODEL = "NO_MODEL:QB_HOLD"
 
 
 def _calibration_block_weight(artifact: dict, market: str, raw_p: float) -> int:
@@ -106,12 +118,8 @@ def _last_start_qb(history: list, team: str, asof: date) -> dict | None:
     return best
 
 
-def _name_key(name: str) -> str:
-    parts = [p for p in str(name).replace(".", " ").split() if p]
-    return parts[-1].lower() if parts else ""
-
-
-def game_context(game: dict, history: list, asof: date, feat: dict, forecast: dict | None) -> dict:
+def game_context(game: dict, history: list, asof: date, feat: dict, forecast: dict | None,
+                 *, starters_doc: dict | None = None, pricing_as_of: object = None) -> dict:
     """Facts behind the card, only from data this run actually retrieved.
 
     Sources: nflverse games history (scores, listed starting QBs) and the
@@ -146,12 +154,20 @@ def game_context(game: dict, history: list, asof: date, feat: dict, forecast: di
     })
     if prop_qbs:
         ctx["dk_qb_props"] = prop_qbs
-        if qbs:
-            known = {_name_key(v["qb"]) for v in qbs.values()}
-            unmatched = [n for n in prop_qbs if _name_key(n) not in known]
-            if unmatched:
-                ctx["qb_change_flag"] = unmatched
+    ctx["qb_check"] = qb_check(
+        away=away, home=home, model_qbs=qbs, starters_doc=starters_doc,
+        pricing_as_of=pricing_as_of,
+        prop_qbs=[{"player": m["player"], "team": m.get("team")}
+                  for m in game.get("markets") or []
+                  if m.get("player") and str(m.get("market")) in QB_PROP_MARKETS],
+    )
     return ctx
+
+
+def qb_lean_block(ctx: dict) -> str | None:
+    """Fail closed: no authoritative verdict -> UNVERIFIED."""
+    block = (ctx.get("qb_check") or {"block": "UNVERIFIED"})["block"]
+    return {None: None, "CHANGE": LEAN_BLOCK_QB_CHANGE}.get(block, LEAN_BLOCK_QB_UNVERIFIED)
 
 
 def _board_rows_from_games(games: list) -> list[dict]:
@@ -248,6 +264,8 @@ def main() -> int:
                     help="independent schedule JSON (fetch_nfl_events rows); kickoff comes only from here")
     ap.add_argument("--fetch-espn-schedule", action="store_true",
                     help="fetch the ESPN public scoreboard for kickoffs; fetch failure refuses pricing")
+    ap.add_argument("--starters", default="",
+                    help="starters JSON {source, retrieved_at, teams:{TEAM:{names:[..], injury_report_checked:true, injury_status}}}")
     args = ap.parse_args()
     ticket = json.loads(Path(args.input).read_text(encoding="utf-8"))
     history = _history_rows(json.loads(Path(args.history).read_text(encoding="utf-8")) if args.history else [])
@@ -267,6 +285,15 @@ def main() -> int:
             schedule = fetch_nfl_events()
         except Exception:  # noqa: BLE001 - any fetch failure refuses pricing
             schedule, schedule_error = [], "SCHEDULE_KICKOFF:UNAVAILABLE"
+    # Authoritative starting-QB source; absent or failed -> every lean blocks.
+    starters_doc: dict | None = None
+    if args.starters:
+        starters_doc = json.loads(Path(args.starters).read_text(encoding="utf-8"))
+    elif args.fetch_espn_schedule:
+        try:
+            starters_doc = fetch_espn_starters(ticket.get("games") or [], asof)
+        except Exception:  # noqa: BLE001 - fail closed
+            starters_doc = None
     games_out = []
     for game in ticket.get("games") or []:
         feat = recency_features(history, home=str(game["home"]), away=str(game["away"]), asof=asof) if history else {"ok": False, "reason": "NO_MODEL:INSUFFICIENT_PRIOR_GAMES"}
@@ -285,7 +312,16 @@ def main() -> int:
                 game["commence_time"] = schedule_kickoff(schedule, away=str(game["away"]), home=str(game["home"]))
             except ResidualQuoteError as exc:
                 residual_error = str(exc)
-        if residual_error is None and feat.get("ok") and forecast is not None:
+        # QB hold (review 5731213002): decide BEFORE any QB-sensitive pricing.
+        # A held game keeps only the captured DK quotes as record evidence; no
+        # model probability, EV, fair line or projection is computed or shown.
+        context = game_context(game, history, asof, feat, forecast,
+                               starters_doc=starters_doc, pricing_as_of=pricing_as_of)
+        qb_block = qb_lean_block(context)
+        if qb_block:
+            context.pop("projection", None)
+            context["qb_hold"] = qb_block
+        elif residual_error is None and feat.get("ok") and forecast is not None:
             try:
                 residual_rows = price_game(
                     game, raw_model_margin=forecast["margin"],
@@ -295,7 +331,7 @@ def main() -> int:
                 )
             except ResidualQuoteError as exc:
                 residual_error = str(exc)
-        elif residual_error is None:
+        if residual_error is None and not (feat.get("ok") and forecast is not None):
             residual_error = str(feat.get("reason") or "NO_PRIOR_MODEL_HISTORY")
 
         for raw in game.get("markets") or []:
@@ -306,6 +342,9 @@ def main() -> int:
             if residual_error is not None:
                 markets.append({**raw, "no_model": "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE",
                                 "residual_research_error": residual_error})
+                continue
+            if qb_block:
+                markets.append({**raw, "no_model": QB_HOLD_NO_MODEL, "qb_hold": qb_block})
                 continue
             choices = [x for x in residual_rows if x["market"] == key]
             if len(choices) != 2:
@@ -325,6 +364,7 @@ def main() -> int:
                 and abs(adjustment) >= float(residual_policy["forward_track_min_abs_adjustment_points"])
             ]
             lean = max(qualified, key=lambda x: (x["ev_per_dollar"], x["edge_probability_points"])) if qualified else None
+            lean_block = None
             if lean:
                 lean = {**lean, "lean_only": True,
                         "lean_reason": "RESEARCH_ONLY:MARKET_ANCHORED_RESIDUAL_FORWARD_CLV_PENDING",
@@ -336,10 +376,10 @@ def main() -> int:
                         })}
                 leans.append(lean)
             markets.append({**raw, "no_model": None, "pick": None, "lean": lean,
+                            "lean_block": lean_block,
                             "residual_mode": True,
                             "residual_research_prices": choices,
                             "residual_research_adjustment": adjustment})
-        context = game_context(game, history, asof, feat, forecast)
         games_out.append({**game, "markets": markets, "picks": picks, "leans": leans,
                           "residual_research_prices": residual_rows,
                           "residual_research_error": residual_error,
