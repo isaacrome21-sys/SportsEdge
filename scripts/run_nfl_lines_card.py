@@ -60,6 +60,7 @@ LEAN_BLOCK_DIRECTION = "NO_LEAN:PROJECTION_DISAGREES"
 # starter. No scoring adjustment is ever invented. run_it_full is untouched.
 LEAN_BLOCK_QB_CHANGE = "NO_LEAN:QB_CHANGE_UNMODELED"
 LEAN_BLOCK_QB_UNVERIFIED = "NO_LEAN:QB_STARTER_UNVERIFIED"
+QB_HOLD_NO_MODEL = "NO_MODEL:QB_HOLD"
 
 
 def _calibration_block_weight(artifact: dict, market: str, raw_p: float) -> int:
@@ -311,7 +312,16 @@ def main() -> int:
                 game["commence_time"] = schedule_kickoff(schedule, away=str(game["away"]), home=str(game["home"]))
             except ResidualQuoteError as exc:
                 residual_error = str(exc)
-        if residual_error is None and feat.get("ok") and forecast is not None:
+        # QB hold (review 5731213002): decide BEFORE any QB-sensitive pricing.
+        # A held game keeps only the captured DK quotes as record evidence; no
+        # model probability, EV, fair line or projection is computed or shown.
+        context = game_context(game, history, asof, feat, forecast,
+                               starters_doc=starters_doc, pricing_as_of=pricing_as_of)
+        qb_block = qb_lean_block(context)
+        if qb_block:
+            context.pop("projection", None)
+            context["qb_hold"] = qb_block
+        elif residual_error is None and feat.get("ok") and forecast is not None:
             try:
                 residual_rows = price_game(
                     game, raw_model_margin=forecast["margin"],
@@ -321,12 +331,9 @@ def main() -> int:
                 )
             except ResidualQuoteError as exc:
                 residual_error = str(exc)
-        elif residual_error is None:
+        if residual_error is None and not (feat.get("ok") and forecast is not None):
             residual_error = str(feat.get("reason") or "NO_PRIOR_MODEL_HISTORY")
 
-        context = game_context(game, history, asof, feat, forecast,
-                               starters_doc=starters_doc, pricing_as_of=pricing_as_of)
-        qb_block = qb_lean_block(context)
         for raw in game.get("markets") or []:
             key = str(raw.get("market") or "").lower()
             if key not in {"moneyline", "spread", "total"}:
@@ -335,6 +342,9 @@ def main() -> int:
             if residual_error is not None:
                 markets.append({**raw, "no_model": "NO_MODEL:RESIDUAL_QUOTES_OR_HISTORY_UNAVAILABLE",
                                 "residual_research_error": residual_error})
+                continue
+            if qb_block:
+                markets.append({**raw, "no_model": QB_HOLD_NO_MODEL, "qb_hold": qb_block})
                 continue
             choices = [x for x in residual_rows if x["market"] == key]
             if len(choices) != 2:
@@ -355,8 +365,6 @@ def main() -> int:
             ]
             lean = max(qualified, key=lambda x: (x["ev_per_dollar"], x["edge_probability_points"])) if qualified else None
             lean_block = None
-            if qb_block:
-                lean, lean_block = None, qb_block
             if lean:
                 lean = {**lean, "lean_only": True,
                         "lean_reason": "RESEARCH_ONLY:MARKET_ANCHORED_RESIDUAL_FORWARD_CLV_PENDING",
