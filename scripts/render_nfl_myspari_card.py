@@ -185,11 +185,17 @@ def why_lines(game: dict) -> list[str]:
     if qbs:
         parts = [f"{team} {qbs[team]['qb']} ({qbs[team]['date'][5:]})" for team in (away, home) if team in qbs]
         out.append("- Last listed starting QB (nflverse): " + "; ".join(parts))
-    if ctx.get("qb_change_flag"):
-        out.append(
-            "- QB check: DK has passing props for " + ", ".join(ctx["qb_change_flag"])
-            + ", who was not either team's last starter. Possible QB change; confirm before using any lean."
-        )
+    check = (ctx.get("qb_check") or {}) if qbs else {}
+    for team in (away, home):
+        row = (check.get("teams") or {}).get(team) or {}
+        st = row.get("starter") or {}
+        if row.get("verdict") == "QB_CHANGE":
+            out.append(f"- QB change ({team}): confirmed starter {st.get('name')} ({st.get('source')}, {str(st.get('retrieved_at'))[:16]})"
+                       f" but the model was built on {row.get('model_qb')}. No lean on this game.")
+        elif row.get("verdict") and row.get("verdict") != "MATCH":
+            out.append(f"- QB not confirmed ({team}): {row['verdict']}. No lean on this game.")
+    for c in (check.get("prop_corroboration") or {}).get("conflicts") or []:
+        out.append(f"- QB prop conflict: {c['player']} ({c['code']}). No lean on this game.")
     if out:
         out.insert(0, "Why (from " + ", ".join(ctx.get("sources") or ["retrieved data"]) + "):")
         inj = (ctx.get("game_info") or {}).get("injuries")
@@ -245,9 +251,9 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
                 if row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
                     why = "model too far from the line; too few past games to price it"
                 elif row.get("lean_block") == "NO_LEAN:QB_CHANGE_UNMODELED":
-                    why = "QB change: the model was built on a different starter"
+                    why = "QB change: confirmed starter differs from the model's QB"
                 elif row.get("lean_block") == "NO_LEAN:QB_STARTER_UNVERIFIED":
-                    why = "starting QBs not confirmed on the board (paste both QBs' props)"
+                    why = "starting QB not confirmed by ESPN depth chart + injury report"
                 elif row.get("lean_block") == "NO_LEAN:PROJECTION_DISAGREES":
                     why = "price-only edge; the model total points the other way"
                 else:
