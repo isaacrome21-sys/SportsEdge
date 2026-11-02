@@ -370,7 +370,7 @@ class NflCardLeanTests(unittest.TestCase):
 class NflEspnStarterFetchTests(unittest.TestCase):
     """fetch_espn_starters against canned ESPN payloads (no network)."""
 
-    def _getter(self, *, kc_depth=None, injuries=None, fail=()):
+    def _getter(self, *, kc_depth=None, injuries=None, summary=None, fail=()):
         from sportsedge.nfl_qb_starter_check import ESPN_BASE
         board = {"events": [{"id": "e1", "competitions": [{"competitors": [
             {"homeAway": "away", "team": {"id": "12", "abbreviation": "KC"}},
@@ -379,7 +379,9 @@ class NflEspnStarterFetchTests(unittest.TestCase):
             return {"depthchart": [{"name": "Base", "positions": {"qb": {"athletes": [
                 {"id": aid, "displayName": name}, {"id": "9", "displayName": "Backup Guy"}]}}}]}
         pages = {
-            f"{ESPN_BASE}/summary?event=e1": {"injuries": injuries or []},
+            f"{ESPN_BASE}/summary?event=e1": summary if summary is not None else {"injuries": injuries if injuries is not None else [
+                {"team": {"id": "12", "abbreviation": "KC"}, "injuries": []},
+                {"team": {"id": "33", "abbreviation": "BAL"}, "injuries": []}]},
             f"{ESPN_BASE}/teams/12/depthcharts": kc_depth or depth("Patrick Mahomes", "3139477"),
             f"{ESPN_BASE}/teams/33/depthcharts": depth("Lamar Jackson", "3916387"),
         }
@@ -407,7 +409,7 @@ class NflEspnStarterFetchTests(unittest.TestCase):
     def test_qb1_out_on_injury_report_is_not_confirmed(self):
         from sportsedge.nfl_qb_starter_check import resolve_starter
         doc = self._fetch(injuries=[{"team": {"id": "12"}, "injuries": [
-            {"athlete": {"id": "3139477"}, "status": "Out"}]}])
+            {"athlete": {"id": "3139477"}, "status": "Out"}]}, {"team": {"id": "33"}, "injuries": []}])
         self.assertEqual(resolve_starter(doc, "KC", "2026-09-20T16:00:00Z")["status"], "STARTER_INJURY_LISTED")
 
     def test_conflicting_qb1_across_formations_is_ambiguous(self):
@@ -426,6 +428,43 @@ class NflEspnStarterFetchTests(unittest.TestCase):
         self.assertEqual(resolve_starter(doc, "BAL", "2026-09-20T16:00:00Z")["status"], "STARTER_SOURCE_UNAVAILABLE")
         doc = self._fetch(fail=("scoreboard",))
         self.assertEqual(resolve_starter(doc, "BAL", "2026-09-20T16:00:00Z")["status"], "STARTER_TEAM_MISSING")
+
+    # Review 5731270304: a summary without a valid injury report must HOLD.
+    def _status(self, team="KC", **kw):
+        from sportsedge.nfl_qb_starter_check import resolve_starter
+        return resolve_starter(self._fetch(**kw), team, "2026-09-20T16:00:00Z")["status"]
+
+    def test_summary_without_injuries_field_holds(self):
+        self.assertEqual(self._status(summary={"header": {}}), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", summary={}), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_empty_injury_list_holds_both_teams(self):
+        self.assertEqual(self._status(injuries=[]), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", injuries=[]), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_report_missing_one_team_holds_only_that_team(self):
+        inj = [{"team": {"id": "33", "abbreviation": "BAL"}, "injuries": []}]
+        self.assertEqual(self._status(injuries=inj), "STARTER_SOURCE_UNAVAILABLE")
+        self.assertEqual(self._status(team="BAL", injuries=inj), "CONFIRMED")
+
+    def test_malformed_injury_report_holds(self):
+        bad = [
+            {"injuries": "n/a"},
+            {"injuries": [None]},
+            {"injuries": [{"injuries": []}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": "x"}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": [{"athlete": {}, "status": "Out"}]}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": [{"athlete": {"id": "3139477"}}]}]},
+            {"injuries": [{"team": {"id": "12"}, "injuries": []}, {"team": {"id": "12"}, "injuries": []}]},
+        ]
+        for summary in bad:
+            with self.subTest(summary=summary):
+                self.assertEqual(self._status(summary=summary), "STARTER_SOURCE_UNAVAILABLE")
+                self.assertEqual(self._status(team="BAL", summary=summary), "STARTER_SOURCE_UNAVAILABLE")
+
+    def test_report_errors_are_recorded(self):
+        doc = self._fetch(summary={})
+        self.assertTrue(any("INJURY_REPORT_ABSENT" in e for e in doc["errors"]))
 
 
 class NflHistoryTeamAliasTests(unittest.TestCase):

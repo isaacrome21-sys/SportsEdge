@@ -17,8 +17,9 @@ not proof of the game-day starter -- final inactives are not consumed, and
      Out / Doubtful / Questionable is NOT a confirmed starter.
   or an operator-supplied ``--starters`` JSON with the same shape.
 
-Fail closed: fetch error, unknown shape, more than one distinct QB1 across
-formations, a single-token (surname-only) name, a missing team, a missing or
+Fail closed: fetch error, unknown shape, an event summary with no valid
+``injuries`` section or no group for the team (not a clean report; review
+5731270304), more than one distinct QB1 across formations, a single-token (surname-only) name, a missing team, a missing or
 stale ``retrieved_at`` -> that team is UNVERIFIED.
 
 DK props are NOT a starter source. They are reported as "prop corroboration"
@@ -108,6 +109,50 @@ def _qb1(depth: dict) -> list[dict]:
     return list(seen.values())
 
 
+class InjuryReportInvalid(Exception):
+    """ESPN injury report absent or not in the expected shape."""
+
+
+def parse_injury_report(summary: object) -> dict[str, dict[str, str]]:
+    """Validate an ESPN event-summary injury report (review 5731270304).
+
+    Returns {"id:<espn team id>"|"abbr:<TEAM>": {athlete_id: status}}. Raises
+    InjuryReportInvalid when the report is absent or its shape is not understood, so
+    the caller marks the team UNVERIFIED (HOLD) instead of treating a missing
+    section as a clean report."""
+    if not isinstance(summary, dict) or "injuries" not in summary:
+        raise InjuryReportInvalid("INJURY_REPORT_ABSENT")
+    groups = summary["injuries"]
+    if not isinstance(groups, list):
+        raise InjuryReportInvalid("INJURY_REPORT_SCHEMA")
+    out: dict[str, dict[str, str]] = {}
+    for group in groups:
+        if not isinstance(group, dict) or not isinstance(group.get("team"), dict) \
+                or not isinstance(group.get("injuries"), list):
+            raise InjuryReportInvalid("INJURY_REPORT_SCHEMA")
+        team = group["team"]
+        keys = [f"id:{team['id']}"] if team.get("id") else []
+        if team.get("abbreviation"):
+            keys.append(f"abbr:{_team(team['abbreviation'])}")
+        if not keys:
+            raise InjuryReportInvalid("INJURY_REPORT_TEAM_MISSING")
+        rows: dict[str, str] = {}
+        for item in group["injuries"]:
+            ath = item.get("athlete") if isinstance(item, dict) else None
+            if not isinstance(ath, dict) or not ath.get("id"):
+                raise InjuryReportInvalid("INJURY_REPORT_ATHLETE_MISSING")
+            st = item.get("status")
+            st = (st.get("name") or st.get("description")) if isinstance(st, dict) else st
+            if not isinstance(st, str) or not st.strip():
+                raise InjuryReportInvalid("INJURY_REPORT_STATUS_MISSING")
+            rows[str(ath["id"])] = st.strip().title()
+        for k in keys:
+            if k in out:
+                raise InjuryReportInvalid("INJURY_REPORT_DUPLICATE_TEAM")
+            out[k] = rows
+    return out
+
+
 def fetch_espn_starters(games: Iterable[dict], slate: date, *, getter: Getter | None = None,
                         now: datetime | None = None, days: int = 6) -> dict:
     """Return a starters document {"source","retrieved_at","teams":{TEAM:{...}},"errors"}.
@@ -135,19 +180,12 @@ def fetch_espn_starters(games: Iterable[dict], slate: date, *, getter: Getter | 
                     events[key] = {"event": event, "sides": sides}
     teams: dict[str, dict] = {}
     for key, found in events.items():
-        injured: dict[str, str] = {}
+        report: dict[str, dict[str, str]] | None
         try:
-            summary = get(f"{ESPN_BASE}/summary?event={found['event'].get('id')}")
-            for group in summary.get("injuries") or []:
-                for item in (group or {}).get("injuries") or []:
-                    ath = (item or {}).get("athlete") or {}
-                    st = item.get("status")
-                    st = (st.get("name") or st.get("description")) if isinstance(st, dict) else st
-                    if ath.get("id"):
-                        injured[str(ath["id"])] = str(st or "").strip().title()
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"injuries {key}: {type(exc).__name__}")
-            injured = None  # type: ignore[assignment]
+            report = parse_injury_report(get(f"{ESPN_BASE}/summary?event={found['event'].get('id')}"))
+        except Exception as exc:  # noqa: BLE001 - absent/unparseable report -> HOLD
+            errors.append(f"injuries {key}: {type(exc).__name__}: {exc}")
+            report = None
         for side in ("away", "home"):
             team_obj = found["sides"][side]["team"]
             code = _team(team_obj.get("abbreviation"))
@@ -159,10 +197,19 @@ def fetch_espn_starters(games: Iterable[dict], slate: date, *, getter: Getter | 
             if not qb1:
                 errors.append(f"depthchart {code}: NO_QB1")
                 continue
+            # The report must carry an explicit group for THIS team (matched by
+            # ESPN team id or abbreviation); a missing group is not "no injuries".
+            team_rows = None
+            if report is not None:
+                team_rows = report.get(f"id:{team_obj.get('id')}")
+                if team_rows is None:
+                    team_rows = report.get(f"abbr:{code}")
+                if team_rows is None:
+                    errors.append(f"injuries {code}: TEAM_NOT_IN_REPORT")
             entry = {"names": [q["name"] for q in qb1],
                      "athlete_id": qb1[0]["athlete_id"] if len(qb1) == 1 else None,
-                     "injury_status": None if injured is None else injured.get(str(qb1[0]["athlete_id"]), ""),
-                     "injury_report_checked": injured is not None}
+                     "injury_status": None if team_rows is None else team_rows.get(str(qb1[0]["athlete_id"]), ""),
+                     "injury_report_checked": team_rows is not None}
             teams[code] = entry
     return {"source": SOURCE_ESPN, "retrieved_at": retrieved_at, "teams": teams, "errors": errors}
 
