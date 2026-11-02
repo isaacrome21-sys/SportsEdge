@@ -159,6 +159,7 @@ def test_r4_card_time_pull_keeps_its_label(tmp_path, monkeypatch):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
     m = importlib.import_module("run_cbb_daily_card")
     monkeypatch.setattr(m, "_get", lambda url: b"team,adjoe\nA,1\n")
+    monkeypatch.setattr(m, "OPERATOR_STORE", tmp_path / "no_operator_store")
     store = tmp_path / "torvik"
     d, note = m.ensure_vintage(D, store)
     assert d.name == "torvik_cardtime" and "not the morning vintage" in note
@@ -238,3 +239,90 @@ def test_r8_opener_renders_its_ct_tip_time():
                              tip_utc="2026-11-02T05:00:00+00:00")), _fx())
     md = render_card_markdown(rows, "2026-11-02", {"records": [1]}, [], "v")
     assert "11:00 PM CT" in md
+
+
+# ---- #3022: ET listing slate vs CT ratings date, per fixture ----
+
+def test_r9_fixture_carries_et_listing_and_ct_ratings_dates():
+    from sportsedge.cbb_daily_card import ratings_date
+    board = {"games": [{"away": "High Point Panthers", "home": "Liberty Flames"}]}
+    fx, _ = fixtures_from_espn(board, OPENER, "2026-11-02")
+    f = fx["High Point Panthers@Liberty Flames"]
+    assert (f["listing_date"], f["slate_date"]) == ("2026-11-02", "2026-11-01")
+    assert ratings_date("2026-11-02T05:00Z") == "2026-11-01"        # 11:00 PM CT Nov 1
+    assert ratings_date("2026-11-02T23:00:00+00:00") == "2026-11-02"  # 5:00 PM CT Nov 2
+
+
+class _Vintage:
+    def __init__(self, d):
+        self.slate_date = d
+
+
+class _Runner:
+    def __init__(self):
+        self.calls = []
+
+    def price_slate(self, d, games, *, vintage, now):
+        assert vintage.slate_date == d and all(g == d for g in games)
+        self.calls.append(d)
+        return {"records": [{"rd": d, "n": len(games)}], "refusals": [],
+                "priced_at": f"{d}T12:00:00+00:00"}
+
+
+def _mixed_fixtures():
+    board = {"games": [{"away": "High Point Panthers", "home": "Liberty Flames"},
+                       {"away": "Winthrop", "home": "Queens"}]}
+    events = OPENER + [{**EVENTS[1], "date": "2026-11-02T23:00Z"}]   # Nov 2 5 PM CT, same ET slate
+    fx, notes = fixtures_from_espn(board, events, "2026-11-02")
+    assert notes == [] and len(fx) == 2
+    return board, fx
+
+
+def test_r9_mixed_ct_dates_in_one_et_slate_price_with_their_own_ratings():
+    from sportsedge.cbb_daily_card import price_by_ratings_date
+    board, fx = _mixed_fixtures()
+    runner = _Runner()
+    gfb = lambda b, group: [f["slate_date"] for f in group.values()]
+    priced, notes = price_by_ratings_date(runner, board, fx, gfb,
+                                          lambda d: (_Vintage(d), f"vintage {d}"), now=None)
+    assert runner.calls == ["2026-11-01", "2026-11-02"]
+    assert priced["ratings_dates"] == ["2026-11-01", "2026-11-02"]
+    assert [r["rd"] for r in priced["records"]] == ["2026-11-01", "2026-11-02"]
+    assert priced["priced_at"] == "2026-11-02T12:00:00+00:00"          # latest clock
+    assert notes == ["Ratings 2026-11-01 (CT): vintage 2026-11-01",
+                     "Ratings 2026-11-02 (CT): vintage 2026-11-02"]
+
+
+def test_r9_missing_ratings_date_refuses_only_its_games_no_carry_forward():
+    from sportsedge.cbb_daily_card import price_by_ratings_date
+    board, fx = _mixed_fixtures()
+    runner = _Runner()
+
+    def vintage_for(d):
+        if d == "2026-11-01":
+            raise RuntimeError("SOURCE_FETCH_FAILED: HTTP 403 from https://barttorvik.com/2027_team_results.csv")
+        return _Vintage(d), "ok"
+    gfb = lambda b, group: [f["slate_date"] for f in group.values()]
+    priced, notes = price_by_ratings_date(runner, board, fx, gfb, vintage_for, now=None)
+    assert runner.calls == ["2026-11-02"]                              # Nov 1 never priced with Nov 2 ratings
+    assert priced["refusals"] == [{"espn_event_id": "401800001", "market": None,
+                                   "reason": "TORVIK_VINTAGE_UNAVAILABLE_FOR_RATINGS_DATE 2026-11-01"}]
+    assert "HTTP 403" in notes[0] and len(priced["records"]) == 1
+    md = render_card_markdown(card_rows(priced, fx), "2026-11-02", priced, [], " ".join(notes))
+    assert "TORVIK_VINTAGE_UNAVAILABLE_FOR_RATINGS_DATE 2026-11-01" in md and "HTTP 403" in md
+
+
+def test_r10_operator_supplied_trank_vintages_load_and_are_labeled(tmp_path, monkeypatch):
+    import importlib, sys, pathlib
+    from sportsedge.cbb_efficiency_forward import load_vintage
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
+    m = importlib.import_module("run_cbb_daily_card")
+    monkeypatch.setattr(m, "_get", lambda url: (_ for _ in ()).throw(AssertionError("no live pull")))
+    for d in ("2026-11-01",):                                       # opener's CT ratings date
+        store, note = m.ensure_vintage(d, tmp_path / "torvik")      # no admitted store
+        assert store == m.OPERATOR_STORE and "owner-supplied T-Rank page" in note
+        assert "not the morning vintage" in note
+        v = load_vintage(d, store)                                  # hash/bytes/rows verified
+        assert v.team_rows == 365 and v.manifest["note"] == m.OPERATOR_NOTE
+        assert v.manifest["pulled_local_date_ct"] == "2026-11-01"
+        assert v.by_team                                            # parsed ratings
