@@ -24,6 +24,9 @@ from sportsedge.nba_phone_prop_pricing import (
 from sportsedge.mlb_phone_first_inning_pricing import (
     phone_first_inning_rows, FIRST_INNING_PHONE_MARKETS)
 from sportsedge.nfl_phone_player_pricing import phone_nfl_player_rows
+from sportsedge.nfl_prop_research_admission import (
+    admission_candidate as nfl_prop_admission_candidate,
+    admit as nfl_prop_admit)
 from sportsedge.cfb_phone_player_pricing import phone_cfb_player_rows
 from sportsedge.prepricing.factor_ingestion import stage_games
 from sportsedge.prepricing.qb_form2_bundle_loader import (
@@ -603,6 +606,7 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     f5_indices, f5_input = [], []
     registry_gated = {}  # local prop index -> registry blocker row
     nba_prop_pending = set()  # local prop index -> NBA prop engine lane
+    nfl_prop_pending = {}  # local prop index -> coverage gate row (NFL research lane)
     intake_gated = {}  # local prop index -> intake contract refusal row
     # Only CFB game-identity evidence may continue through prepricing.
     # The registry still blocks its pricer, output probabilities and
@@ -722,6 +726,16 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
                 prop_indices.append(i)
                 props.append(line)
                 nba_prop_pending.add(len(props) - 1)
+                continue
+            # NFL player props (owner ruling Nov 1 2026; see
+            # sportsedge.nfl_prop_research_admission): the empirical
+            # gamelog pricer is admitted as a RESEARCH-ONLY lane. The row
+            # is re-judged after pricing; without the engine's sufficiency
+            # stamp the original blocker row is restored.
+            if nfl_prop_admission_candidate(line["sport"], market, gate):
+                prop_indices.append(i)
+                props.append(line)
+                nfl_prop_pending[len(props) - 1] = gate
                 continue
             # Every other blocked family/market (including CFB props,
             # NBA/CBB, Illinois schools) is refused before any pricer.
@@ -1001,6 +1015,10 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
         if local in nba_prop_pending:
             nba_pos.append(local)
             nba_input.append(line)
+            continue
+        if local in nfl_prop_pending:
+            nfl_pos.append(local)
+            nfl_input.append(line)
             continue
         market = str(line.get("market") or "").upper()
         if line["sport"] == "NFL" and market in _NFL_RULING_DERIVATIVE_TRANSLATION:
@@ -1407,6 +1425,8 @@ def _run_full_impl(payload, *, now=None, as_of=None, historical=False, getter=No
     for local, result in zip(td_pos, td_results):
         modeled_props[local] = result
     for local, result in zip(nfl_pos, nfl_results):
+        if local in nfl_prop_pending:
+            result = nfl_prop_admit(result, nfl_prop_pending[local])
         modeled_props[local] = result
     for local, result in zip(cfb_pos, cfb_results):
         modeled_props[local] = result
