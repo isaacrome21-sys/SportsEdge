@@ -1,0 +1,39 @@
+{
+  "schema": "CFB_FINAL_SCORES_V1",
+  "date": "2026-10-30",
+  "source": "ESPN_SCOREBOARD",
+  "official": false,
+  "games": [
+    {
+      "game_id": "401856844",
+      "away_team": "Baylor",
+      "home_team": "UCF",
+      "away_points": 41,
+      "home_points": 9,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-30T23:30Z",
+      "captured_at_utc": "2026-11-01T17:45:21.211488+00:00"
+    },
+    {
+      "game_id": "401862813",
+      "away_team": "Tulane",
+      "home_team": "Charlotte",
+      "away_points": 38,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-30T23:00Z",
+      "captured_at_utc": "2026-11-01T17:45:21.211488+00:00"
+    },
+    {
+      "game_id": "401866451",
+      "away_team": "Kent State",
+      "home_team": "Sacramento State",
+      "away_points": 10,
+      "home_points": 31,
+      "status": "STATUS_FINAL",
+      "start_ts": "2026-10-31T02:30Z",
+      "captured_at_utc": "2026-11-01T17:45:21.211488+00:00"
+    }
+  ],
+  "last_captured_at_utc": "2026-11-01T17:45:21.211488+00:00"
+}
