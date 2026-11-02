@@ -149,7 +149,8 @@ def test_render_empty_and_refusals():
                               {"records": [], "refusals": [{"market": None, "espn_event_id": "9",
                                                             "reason": "ILLINOIS_COLLEGE_EXCLUDED"}]},
                               ["x: no ESPN game found"], "Ratings: morning Torvik vintage.")
-    assert "No plays clear" in md and "ILLINOIS_COLLEGE_EXCLUDED" in md and "Not on card (2)" in md
+    assert "No research candidates clear" in md and "ILLINOIS_COLLEGE_EXCLUDED" in md and "Not on card (2)" in md
+    assert "NOT COUNTED · PAPER / 0u · NO PLAY" in md and " plays" not in md
     assert "assuming normal errors" in md
 
 
@@ -191,3 +192,11 @@ def test_r6_canonical_180s_freshness_gate():
     assert one_side[0]["bucket"] == "STALE_QUOTE"
     unverified = card_rows({"records": [rec]}, _fx())
     assert unverified[0]["bucket"] == "STALE_QUOTE"
+
+
+def test_r7_owner_option_a_banner_on_nonempty_card():
+    rows = card_rows(_P(_rec("TOTAL", -4.6, "UNDER", 155.5, a=-105, b=-115, model=150.9)), _fx())
+    md = render_card_markdown(rows, D, {"records": [1]}, [], "v")
+    assert md.count("NOT COUNTED · PAPER / 0u · NO PLAY") == 1
+    assert md.index("NO PLAY") < md.index("Under 155.5")      # banner above all rows
+    assert "★" in md and "EV +" in md and " plays" not in md

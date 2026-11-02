@@ -55,6 +55,10 @@ CT = ZoneInfo("America/Chicago")
 SCREEN_MAE = {"SPREAD": 8.899, "TOTAL": 13.812}
 SIGMA = {m: mae * math.sqrt(math.pi / 2) for m, mae in SCREEN_MAE.items()}
 STAR_CUTS = (0.03, 0.06, 0.10, 0.15)   # EV < 3% = 1 star ... >= 15% = 5 stars
+# Owner ruling (Nov 1, 2026, Option A; review 5731130797): ONE visible
+# banner on every rendered card, empty or not; stars/EV stay per row and
+# no per-row status labels are repeated.
+BANNER = "**🏀 CBB Research Picks — NOT COUNTED · PAPER / 0u · NO PLAY**"
 
 
 # ------------------------------------------------------------------ identity
@@ -275,9 +279,9 @@ def card_rows(priced: dict, fixtures: dict) -> list[dict]:
 def render_card_markdown(rows: list[dict], slate_date: str, priced: dict,
                          notes: list[str], vintage_note: str) -> str:
     heads = [r for r in rows if r["bucket"] == "HEADLINE"]
-    out = [f"## 🏀 CBB card — {slate_date}", ""]
+    out = [f"## 🏀 CBB card — {slate_date}", "", BANNER, ""]
     if not heads:
-        out += ["No plays clear the pick rule (spread gap ≥ 2.2, total gap ≥ 3.5) and the card gates today."]
+        out += ["No research candidates clear the pick rule (spread gap ≥ 2.2, total gap ≥ 3.5) and the card gates today."]
     if any(r["bucket"] == "STALE_QUOTE" for r in rows):
         out += [f"Lines older than {MAX_QUOTE_AGE_SECONDS}s when priced aren't headlined — repost fresh lines to price them."]
     for r in heads:
@@ -291,7 +295,7 @@ def render_card_markdown(rows: list[dict], slate_date: str, priced: dict,
         out += ["", "⚠️ Too-good-to-be-true (EV ≥ 40%, not headlined — check the line and injuries):"]
         out += [f"- {r['pick']} ({r['price']:+d}) · {r['game']}" for r in quarantined]
     n_rec = len(priced.get("records", []))
-    out += ["", f"Priced {n_rec} lines; {len(heads)} plays. {vintage_note}",
+    out += ["", f"Priced {n_rec} lines; {len(heads)} research candidates. {vintage_note}",
             "EV approximates win chance from the model's average historical miss "
             f"(spread σ {SIGMA['SPREAD']:.1f}, total σ {SIGMA['TOTAL']:.1f} pts), "
             "assuming normal errors. 21+."]
