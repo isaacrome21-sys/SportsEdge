@@ -32,8 +32,10 @@ def _history() -> list[dict]:
     games = []
     for i in range(8):
         day = f"2026-09-{i + 1:02d}"
-        games.append({"date": day, "id": f"a{i}", "home": "KC", "away": "LV", "hs": 27, "as": 20})
-        games.append({"date": day, "id": f"b{i}", "home": "BAL", "away": "CIN", "hs": 24, "as": 21})
+        games.append({"date": day, "id": f"a{i}", "home": "KC", "away": "LV", "hs": 27, "as": 20,
+                      "home_qb": "Patrick Mahomes", "away_qb": "Geno Smith"})
+        games.append({"date": day, "id": f"b{i}", "home": "BAL", "away": "CIN", "hs": 24, "as": 21,
+                      "home_qb": "Lamar Jackson", "away_qb": "Joe Burrow"})
     return games
 
 
@@ -67,10 +69,17 @@ def _run(ticket: dict, schedule: list | None = SCHEDULE) -> tuple[dict, str]:
         (t / "ticket.json").write_text(json.dumps(ticket), encoding="utf-8")
         (t / "hist.json").write_text(json.dumps(_history()), encoding="utf-8")
         (t / "sched.json").write_text(json.dumps(schedule), encoding="utf-8")
+        # Starters fixture (QB guard, #3017): both teams' model QBs confirmed.
+        starters = {"source": "TEST_FIXTURE", "retrieved_at": (AS_OF - timedelta(hours=1)).isoformat(),
+                    "teams": {t_: {"names": [n], "injury_report_checked": True, "injury_status": ""}
+                              for t_, n in {"KC": "Patrick Mahomes", "BAL": "Lamar Jackson",
+                                            "LV": "Geno Smith", "CIN": "Joe Burrow"}.items()}}
+        (t / "starters.json").write_text(json.dumps(starters), encoding="utf-8")
         env = {"PYTHONPATH": str(ROOT)}
         subprocess.run([sys.executable, "scripts/run_nfl_lines_card.py", "--input", str(t / "ticket.json"),
                         "--history", str(t / "hist.json"), "--output", str(t / "card.json"),
-                        "--as-of", AS_OF.isoformat(), "--schedule", str(t / "sched.json")],
+                        "--as-of", AS_OF.isoformat(), "--schedule", str(t / "sched.json"),
+                        "--starters", str(t / "starters.json")],
                        cwd=ROOT, env=env, check=True)
         subprocess.run([sys.executable, "scripts/render_nfl_myspari_card.py", "--engine-output", str(t / "card.json"),
                         "--snapshot", str(t / "ticket.json"), "--out-dir", str(t / "out")],
