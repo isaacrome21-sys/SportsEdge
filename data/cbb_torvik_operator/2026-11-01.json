@@ -1,0 +1,15 @@
+{
+ "as_of_local_date": "2026-11-01",
+ "pulled_at_utc": "2026-11-02T02:47:07Z",
+ "pulled_local_date_ct": "2026-11-01",
+ "sha256": "76c70e55899bd808b7b378503297e4f966ac760196eb8916653c526b24214901",
+ "bytes": 18976,
+ "team_rows": 365,
+ "evidence_state": "verified-by-pull",
+ "note": "OPERATOR_SUPPLIED_TRANK_PAGE_NOT_MORNING_VINTAGE",
+ "pull_method": "Owner device: Safari PDF of barttorvik.com T-Rank 2027 page (server-side access from GitHub Actions and the Claude sandbox returned HTTP 403); transcribed column-for-column (rank, team, conf, record, adjoe, adjde, barthag, adjt, wab) by Claude",
+ "source_page_title": "T-Rank - Customizable College Basketball Tempo Free Stats - T-Rank",
+ "source_pdf_sha256": "c3cec64ce84178c46fd0a6a7b5621c113da533b8bf0615a25f461c7550d2f2fb",
+ "owner_authorized": "Isaac supplied the page in chat 2026-11-01 20:47 CT after the 403",
+ "research_only": true
+}
