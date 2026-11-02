@@ -17,9 +17,14 @@ on:
       - '.github/workflows/capper-vetter.yml'
   issues:
     types: [opened, edited]
-  schedule:
-    - cron: '17 11 * * *'   # 5:17 AM CT standard time: settle yesterday's games
+  issue_comment:
+    types: [created, edited]
   workflow_dispatch:
+# No schedule: SPORTSEDGE_WORKFLOW_CRON_POLICY_V1 does not list this
+# workflow, and the frozen policy is not relaxed for it. Grades refresh
+# whenever a [CAPPER] issue is filed, edited or commented ("close:",
+# "result:"), and on manual dispatch. Each run rewrites ONE tracker
+# issue body in place, so event-triggered runs never spam comments.
 
 permissions:
   contents: read
@@ -44,8 +49,10 @@ jobs:
 
   grade:
     if: >-
-      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[CAPPER]') &&
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'issues' || github.event_name == 'issue_comment') &&
+       !github.event.issue.pull_request &&
+       startsWith(github.event.issue.title, '[CAPPER]') &&
        !startsWith(github.event.issue.title, '[CAPPER RANKINGS]'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -58,17 +65,9 @@ jobs:
         with:
           python-version-file: '.python-version'
       - name: Grade outside cappers
-        shell: bash
         run: |
-          # New/edited pick: check it parses, don't spam the tracker. Daily/manual: post the table.
-          if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
-            python scripts/run_capper_vetter.py
-          else
-            python scripts/run_capper_vetter.py --post
-          fi
-      - name: Add run summary
-        if: always()
-        run: test ! -f artifacts/capper_vetter/rankings.md || cat artifacts/capper_vetter/rankings.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/run_capper_vetter.py --post
+          cat artifacts/capper_vetter/rankings.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
