@@ -9,7 +9,9 @@ Owner rule (relay #2447, Nov 1 2026): block leans when the model's QB differs
 from the confirmed starter OR the starter cannot be verified. Never invent a
 scoring adjustment.
 
-Starter source (authoritative, team-bound, timestamped):
+Starter source (team-bound, timestamped; a PROVISIONAL availability screen,
+not proof of the game-day starter -- final inactives are not consumed, and
+"CONFIRMED" below means only "passed this screen"; review 5731213002):
   1. ESPN public team depth chart, QB1 (``/teams/{id}/depthcharts``), and
   2. ESPN injury report for the event (``/summary?event=``): a QB1 listed
      Out / Doubtful / Questionable is NOT a confirmed starter.
@@ -20,8 +22,10 @@ formations, a single-token (surname-only) name, a missing team, a missing or
 stale ``retrieved_at`` -> that team is UNVERIFIED.
 
 DK props are NOT a starter source. They are reported as "prop corroboration"
-only, and can only ADD a block (a prop for a QB who is neither confirmed
-starter, or a prop whose team disagrees with the confirmed starter's team);
+only, and can only ADD a hold: a prop for a QB who is neither screened
+starter, a prop whose team disagrees with the screened starter's team, or a
+prop for a passer who is not the model's QB (CHANGE: the board itself shows
+the model was built on a different offense, e.g. #3015 McKee vs Hurts);
 they can never clear one.
 """
 from __future__ import annotations
@@ -226,8 +230,20 @@ def qb_check(*, away: str, home: str, model_qbs: dict, starters_doc: dict | None
         elif owner and p.get("team") and _team(p["team"]) != owner[0]:
             corroboration["conflicts"].append({"player": p.get("player"), "code": "PROP_TEAM_CONFLICT"})
 
+    # Board evidence (owner correction, #3015): a posted DK QB prop for a
+    # passer who is neither team's model QB means the model was built on a
+    # different offense. Props never CONFIRM a starter, but they can show a
+    # change -> CHANGE hold.
+    model_canon = {canonical_qb((model_qbs.get(t) or {}).get("qb")) for t in (away, home)} - {None}
+    if model_canon:
+        for p in prop_qbs:
+            canon = canonical_qb(p.get("player"))
+            if canon and canon not in model_canon:
+                corroboration["conflicts"].append({"player": p.get("player"), "code": "PROP_QB_DIFFERS_FROM_MODEL_QB"})
+
     verdicts = [r["verdict"] for r in teams.values()]
-    if "QB_CHANGE" in verdicts:
+    if "QB_CHANGE" in verdicts or any(
+            c["code"] == "PROP_QB_DIFFERS_FROM_MODEL_QB" for c in corroboration["conflicts"]):
         block = "CHANGE"
     elif any(v != "MATCH" for v in verdicts) or corroboration["conflicts"]:
         block = "UNVERIFIED"
