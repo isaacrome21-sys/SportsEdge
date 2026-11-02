@@ -19,7 +19,7 @@ The key comes from SPORTSEDGE_ODDSPAPI_KEY and is never printed or written.
 `python simple/board.py selftest` runs offline checks with synthetic payloads.
 `python simple/board.py rebuild OUT_DIR DAY HHMM` re-prices saved raw payloads with no calls.
 """
-import json, os, re, sys, time
+import fcntl, json, os, re, sys, time
 from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -47,10 +47,13 @@ class Budget:
 
     def __init__(self, path, day, cap=MAX_CALLS_PER_DAY):
         self.path, self.day, self.cap = path, day, cap
+        self._load()
+
+    def _load(self):
         self.corrupt, self.log = False, {}
-        if os.path.lexists(path):
+        if os.path.lexists(self.path):
             try:
-                with open(path) as fh:
+                with open(self.path) as fh:
                     self.log = json.load(fh)
             except (OSError, ValueError):
                 self.corrupt = True
@@ -64,16 +67,25 @@ class Budget:
         return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else self.cap
 
     def spend(self):
-        if self.corrupt:
-            raise Refused("BUDGET_FILE_CORRUPT")
-        if self.used() >= self.cap:
-            raise Refused("DAILY_CALL_CAP_REACHED")
-        self.log[self.day] = self.used() + 1
+        """Count one call. The count is re-read from disk under an exclusive lock, so two Budget
+        objects (or two processes) on the same file can never admit more than cap between them
+        (review 5730373706). Separate workflow runs are serialized by the workflow concurrency group."""
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        tmp = self.path + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(self.log, fh, indent=1, sort_keys=True)
-        os.replace(tmp, self.path)
+        with open(self.path + ".lock", "a") as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            try:
+                self._load()
+                if self.corrupt:
+                    raise Refused("BUDGET_FILE_CORRUPT")
+                if self.used() >= self.cap:
+                    raise Refused("DAILY_CALL_CAP_REACHED")
+                self.log[self.day] = self.used() + 1
+                tmp = self.path + ".tmp"
+                with open(tmp, "w") as fh:
+                    json.dump(self.log, fh, indent=1, sort_keys=True)
+                os.replace(tmp, self.path)
+            finally:
+                fcntl.flock(lk, fcntl.LOCK_UN)
 
 
 _last_call = [None]
@@ -195,6 +207,15 @@ def to_american(d):
 def side_label(pin_boid, home, away):
     """Readable side from Pinnacle's own outcome id, e.g. 'away/79.5/under' -> 'Duke Under 79.5'."""
     parts = [x for x in pin_boid.split("/") if x]
+    if len(parts) == 2 and parts[1].lower() in ("home", "away"):
+        try:
+            h = float(parts[0])  # Pinnacle spread ids carry the HOME handicap: '-7.5/away' = away +7.5
+        except ValueError:
+            h = None
+        if h is not None and h == h and abs(h) < 1000:
+            home_side = parts[1].lower() == "home"
+            line = h if home_side else -h
+            return "%s %s" % (home if home_side else away, "PK" if line == 0 else "%+g" % line)
     words = []
     for x in parts:
         lx = x.lower()
@@ -404,7 +425,12 @@ def selftest():
     assert by[("900", "over")]["bet"] == "A Smith Over 55.5"
     assert side_label("away/79.5/under", "H", "A") == "A Under 79.5"
     assert side_label("20.5/over", "H", "A") == "Over 20.5"
-    assert side_label("3.0/home", "H", "A") == "3.0 H"
+    assert side_label("3.0/home", "H", "A") == "H +3"
+    assert side_label("-7.5/away", "H", "A") == "A +7.5"      # home -7.5 -> away +7.5 (review 5730373706)
+    assert side_label("7.5/away", "H", "A") == "A -7.5"
+    assert side_label("-6.5/home", "H", "A") == "H -6.5"
+    assert side_label("0.0/away", "H", "A") == "A PK"
+    assert side_label("nan/home", "H", "A") == "nan H"
     # started games are excluded
     assert board([fx("draftkings", (1.95, 1.87), (2.1, 1.74), start="2020-01-01T00:00:00Z")], [pin], {}, {}, asof)[0] == []
     # inactive / missing side -> group incomplete -> no row
@@ -440,6 +466,19 @@ def selftest():
     except Refused:
         pass
     assert Budget(os.path.join(d, "c.json"), "2026-11-01", cap=2).used() == 2
+    # two Budget objects loaded at cap-1 admit exactly one call between them (review 5730373706 race)
+    rp = os.path.join(d, "race.json")
+    with open(rp, "w") as fh:
+        json.dump({"2026-11-01": 19}, fh)
+    b1, b2 = Budget(rp, "2026-11-01", cap=20), Budget(rp, "2026-11-01", cap=20)
+    assert b1.used() == 19 and b2.used() == 19
+    b1.spend()
+    try:
+        b2.spend(); raise AssertionError("stale Budget object admitted call 21")
+    except Refused as e:
+        assert str(e) == "DAILY_CALL_CAP_REACHED", e
+    with open(rp) as fh:
+        assert json.load(fh) == {"2026-11-01": 20}
     # corrupt / non-object budget file fails closed and is left untouched (review 5729925753)
     for bad in ("{broken", "[1, 2]", "null", '"x"'):
         p = os.path.join(d, "bad.json")
