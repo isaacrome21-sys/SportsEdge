@@ -51,6 +51,12 @@ from sportsedge.lane_a_card_gates import (
 )
 
 CT = ZoneInfo("America/Chicago")
+# Official slate-date convention (relay #2447, opening-night fix): a CBB
+# slate date is the game's US EASTERN calendar date -- the convention of
+# ESPN's scoreboard ``dates=`` query and of DraftKings' day grouping. The
+# 2026-27 opener (High Point vs Liberty, tip 12:00 AM ET Nov 2 = 11:00 PM
+# CT Nov 1) is therefore on slate 2026-11-02. Display times stay CT.
+SLATE_TZ = ZoneInfo("America/New_York")
 
 SCREEN_MAE = {"SPREAD": 8.899, "TOTAL": 13.812}
 SIGMA = {m: mae * math.sqrt(math.pi / 2) for m, mae in SCREEN_MAE.items()}
@@ -97,16 +103,17 @@ def _sides(ev: dict):
 
 
 def _local_date(ev: dict) -> str | None:
+    """The event's slate date: its US Eastern calendar date (SLATE_TZ)."""
     tip = parse_ts(str(ev.get("date", "")).replace("Z", "+00:00"))
-    return tip.astimezone(CT).strftime("%Y-%m-%d") if tip and tip.tzinfo else None
+    return tip.astimezone(SLATE_TZ).strftime("%Y-%m-%d") if tip and tip.tzinfo else None
 
 
 def fixtures_from_espn(board: dict, events: list[dict], slate_date: str) -> tuple[dict, list[str]]:
     """Build the runners' fixture table keyed "AWAY@HOME" (DK display
     names) from ESPN scoreboard events.
 
-    Fail-closed identity: only events whose local (CT) date is the slate
-    date are eligible. A comment-carried ESPN event id is honored ONLY
+    Fail-closed identity: only events whose US Eastern (SLATE_TZ) date is
+    the slate date are eligible. A comment-carried ESPN event id is honored ONLY
     when that event's away AND home teams both corroborate the captured
     names; a supplied id that is unknown, off-date, or names other teams
     REFUSES the game (no silent fallback to a name match). Without an
