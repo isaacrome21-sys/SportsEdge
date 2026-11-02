@@ -24,6 +24,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,14 +39,22 @@ from sportsedge.cbb_efficiency_forward import (  # noqa: E402
 )
 from sportsedge.cbb_lines_intake import parse_cbb_lines  # noqa: E402
 
-UA = "Mozilla/5.0 (SportsEdge CBB card)"
+# Same browser User-Agent as the admitted live Torvik route
+# (research/cbb_barttorvik_live_route_20261028/pull_bart_live.py). The
+# earlier bot-style UA got HTTP 403 on the first live run (#3021).
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 TORVIK_URL = "https://barttorvik.com/{year}_team_results.csv"
 
 
 def _get(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.read()
+    except urllib.error.HTTPError as exc:
+        # Name the failing source on the issue instead of a bare traceback.
+        raise SystemExit(f"SOURCE_FETCH_FAILED: HTTP {exc.code} from {url}") from exc
 
 
 def espn_events(date: str) -> list[dict]:
