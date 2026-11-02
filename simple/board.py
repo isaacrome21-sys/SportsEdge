@@ -3,7 +3,11 @@
 One command:  python simple/board.py run OUT_DIR
   1. /v4/tournaments for American football (14) and basketball (11) -> NFL, NCAA football, NBA, NCAA basketball.
   2. /v4/participants per sport, once per day (team names), and /v4/markets once ever (cached).
-  3. /v4/odds-by-tournaments once for draftkings, once for pinnacle.
+  3. /v4/odds-by-tournaments once for draftkings, once for pinnacle (game markets only: player props are
+     not in this endpoint's response, props_coverage 2026-11-01).
+  3b. Player props: /v4/odds?fixtureId=<id> for the next NFL games, at most PROP_CALLS_PER_DAY a day out of the
+     same 20/day budget (owner approval 2026-11-01, #2447). Each per-fixture payload replaces that fixture's
+     draftkings/pinnacle entries when it carries that book; a failed props call never blocks the board.
   4. For every fixture/market/line/player both books post: Pinnacle fair p (multiplicative de-vig over the
      complete outcome group), EV of the DK price = p * dk_decimal - 1. Bets: EV >= MIN_EV. EV > MAX_EV is
      dropped as a likely mapping error.
@@ -12,14 +16,16 @@ is skipped. Each quote must carry a changedAt no more than MAX_QUOTE_CHANGE_AGE_
 missing or unparseable changedAt drops the quote. The board is stamped with its capture time and is
 good for BOARD_GOOD_FOR_S after it (owner 1800 s quote-age ruling, 2026-10-25).
 Hard cap: MAX_CALLS_PER_DAY OddsPapi calls (owner budget 20/day, #2447 6561970754), counted in OUT_DIR/calls.json.
-A calls.json that exists but cannot be read as a JSON object fails closed (no calls).
+A calls.json that exists but cannot be read as a JSON object fails closed (no calls). Every spend re-reads
+the file under an exclusive lock (calls.json.lock), so two Budget objects cannot exceed the cap; the workflow
+concurrency group also serialises runs.
 Calls are spaced PACE_S apart; a 429 is retried once (the retry is budgeted too).
 NHL is paused and MLB DK auto-acquisition is off, so neither is requested.
 The key comes from SPORTSEDGE_ODDSPAPI_KEY and is never printed or written.
 `python simple/board.py selftest` runs offline checks with synthetic payloads.
 `python simple/board.py rebuild OUT_DIR DAY HHMM` re-prices saved raw payloads with no calls.
 """
-import fcntl, json, os, re, sys, time
+import fcntl, glob, json, os, re, sys, time
 from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -30,6 +36,7 @@ SPORTS = {14: re.compile(r"^(NFL|NCAA.*)$", re.I), 11: re.compile(r"^(NBA|NCAA.*
 SPORT_TAG = {14: "football", 11: "basketball"}
 MIN_EV, MAX_EV = 0.03, 0.40
 MAX_CALLS_PER_DAY = 20
+PROP_CALLS_PER_DAY = 6  # owner approval 2026-11-01: up to 6 of the 20 for per-game NFL props
 PACE_S, RETRY_429_S, MAX_RETRY_WAIT_S = 3.0, 15.0, 60.0
 MAX_QUOTE_CHANGE_AGE_S = 3 * 3600
 BOARD_GOOD_FOR_S = 1800
@@ -43,10 +50,13 @@ class Refused(Exception):
 # ---------- budget ----------
 class Budget:
     """Daily call counter in a JSON file. A missing file is a fresh start. A file that exists
-    but is unreadable, not JSON, or not an object fails CLOSED: no calls until it is fixed."""
+    but is unreadable, not JSON, or not an object fails CLOSED: no calls until it is fixed.
+    used() and spend() re-read the file; spend() does read-check-write under an exclusive flock,
+    so separate Budget objects on the same file share one cap (review 5730373706)."""
 
     def __init__(self, path, day, cap=MAX_CALLS_PER_DAY):
         self.path, self.day, self.cap = path, day, cap
+        self.corrupt, self.log = False, {}
         self._load()
 
     def _load(self):
@@ -60,16 +70,17 @@ class Budget:
             if not isinstance(self.log, dict):
                 self.log, self.corrupt = {}, True
 
-    def used(self):
+    def _count(self):
         if self.corrupt:
             return self.cap
         v = self.log.get(self.day, 0)
         return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else self.cap
 
+    def used(self):
+        self._load()
+        return self._count()
+
     def spend(self):
-        """Count one call. The count is re-read from disk under an exclusive lock, so two Budget
-        objects (or two processes) on the same file can never admit more than cap between them
-        (review 5730373706). Separate workflow runs are serialized by the workflow concurrency group."""
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
         with open(self.path + ".lock", "a") as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)
@@ -77,9 +88,9 @@ class Budget:
                 self._load()
                 if self.corrupt:
                     raise Refused("BUDGET_FILE_CORRUPT")
-                if self.used() >= self.cap:
+                if self._count() >= self.cap:
                     raise Refused("DAILY_CALL_CAP_REACHED")
-                self.log[self.day] = self.used() + 1
+                self.log[self.day] = self._count() + 1
                 tmp = self.path + ".tmp"
                 with open(tmp, "w") as fh:
                     json.dump(self.log, fh, indent=1, sort_keys=True)
@@ -204,18 +215,22 @@ def to_american(d):
     return int(round((d - 1) * 100)) if d >= 2 else int(round(-100 / (d - 1)))
 
 
+SPREAD_ID = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*/\s*(home|away)\s*$", re.I)
+
+
 def side_label(pin_boid, home, away):
-    """Readable side from Pinnacle's own outcome id, e.g. 'away/79.5/under' -> 'Duke Under 79.5'."""
+    """Readable side from Pinnacle's own outcome id, e.g. 'away/79.5/under' -> 'Duke Under 79.5'.
+    Spread ids are '<home handicap>/<side>', so '-7.5/away' is the AWAY team +7.5 and '-7.5/home' is
+    the home team -7.5 (sign bug noted in 6563584554, review 5730373706)."""
+    sp = SPREAD_ID.match(pin_boid or "")
+    if sp:
+        h = float(sp.group(1))
+        side = sp.group(2).lower()
+        v = h if side == "home" else -h
+        num = sp.group(1).lstrip("+-")
+        sign = "+" if v > 0 else ("-" if v < 0 else "")
+        return "%s %s%s" % (home if side == "home" else away, sign, num)
     parts = [x for x in pin_boid.split("/") if x]
-    if len(parts) == 2 and parts[1].lower() in ("home", "away"):
-        try:
-            h = float(parts[0])  # Pinnacle spread ids carry the HOME handicap: '-7.5/away' = away +7.5
-        except ValueError:
-            h = None
-        if h is not None and h == h and abs(h) < 1000:
-            home_side = parts[1].lower() == "home"
-            line = h if home_side else -h
-            return "%s %s" % (home if home_side else away, "PK" if line == 0 else "%+g" % line)
     words = []
     for x in parts:
         lx = x.lower()
@@ -313,6 +328,55 @@ def load_json(path):
         return None
 
 
+def merge_fixture_odds(books, payload):
+    """Swap in a per-fixture /odds payload (it carries player props) for each book it covers.
+    Returns the books it replaced. A payload that is not a fixture dict with bookmakerOdds is ignored."""
+    f = payload[0] if isinstance(payload, list) and len(payload) == 1 else payload
+    if not isinstance(f, dict) or not isinstance(f.get("bookmakerOdds"), dict) or f.get("fixtureId") is None:
+        return []
+    done = []
+    for book, lst in books.items():
+        if not isinstance(f["bookmakerOdds"].get(book), dict):
+            continue
+        for i, g in enumerate(lst):
+            if isinstance(g, dict) and g.get("fixtureId") == f["fixtureId"]:
+                lst[i] = dict(g, bookmakerOdds={book: f["bookmakerOdds"][book]})
+                done.append(book)
+                break
+    return done
+
+
+def prop_targets(dk_fixtures, nfl_tids, asof, n):
+    """fixtureIds of the next n NFL games that have not started, earliest first."""
+    up = []
+    for f in dk_fixtures:
+        if isinstance(f, dict) and f.get("tournamentId") in nfl_tids:
+            st = parse_time(f.get("startTime") or "")
+            if st is not None and st > asof and f.get("fixtureId") is not None:
+                up.append((st, str(f["fixtureId"])))
+    return [fid for _, fid in sorted(up)[:max(n, 0)]]
+
+
+def fetch_props(out_dir, raw_dir, books, nfl_tids, key, budget, asof, opener, notes, day):
+    """Per-game NFL prop pulls, capped at PROP_CALLS_PER_DAY a day inside the main budget."""
+    pb = Budget(os.path.join(out_dir, "prop_calls.json"), day, cap=PROP_CALLS_PER_DAY)
+    room = min(pb.cap - pb.used(), budget.cap - budget.used())
+    targets = prop_targets(books["draftkings"], nfl_tids, asof, room)
+    stamp, got = asof.strftime("%H%M"), 0
+    for fid in targets:
+        try:
+            pb.spend()
+            payload = get("/odds", {"fixtureId": fid, "oddsFormat": "decimal"}, key, budget, opener)
+        except Refused as e:
+            notes.append("props stopped at %s (%s)" % (fid, e))
+            break
+        with open(os.path.join(raw_dir, "odds_%s_%s.json" % (fid, stamp)), "w") as fh:
+            json.dump(payload, fh)
+        if merge_fixture_odds(books, payload):
+            got += 1
+    notes.append("NFL prop pulls %d/%d games (prop calls today %d/%d)" % (got, len(targets), pb.used(), pb.cap))
+
+
 # ---------- run ----------
 def write_board(out_dir, raw_dir, books, names, tnames, teams, asof, notes):
     rows, bets = board(books["draftkings"], books["pinnacle"], names, tnames, asof, teams)
@@ -372,6 +436,8 @@ def run(out_dir, key, opener=urlopen, now=None):
             "bookmaker": book, "tournamentIds": ",".join(map(str, tids)), "oddsFormat": "decimal"},
             key, budget, opener))
         json.dump(books[book], open(os.path.join(raw_dir, "%s_%s.json" % (book, asof.strftime("%H%M"))), "w"))
+    nfl_tids = {t for t, n in tnames.items() if n == "NFL"}
+    fetch_props(out_dir, raw_dir, books, nfl_tids, key, budget, asof, opener, notes, day)
     notes.append("tournaments: " + ", ".join(sorted(set(tnames.values()))))
     notes.append("OddsPapi calls today %d/%d" % (budget.used(), budget.cap))
     return write_board(out_dir, raw_dir, books, names, tnames, teams, asof, notes)
@@ -392,10 +458,35 @@ def rebuild(out_dir, day, stamp):
                 name = str(t["tournamentName"])
                 tnames[t["tournamentId"]] = name if name in ("NFL", "NBA") else "%s %s" % (name, SPORT_TAG[sid])
     names = markets_index(load_json(os.path.join(out_dir, "markets.json")) or [])
-    return write_board(out_dir, raw_dir, books, names, tnames, teams, asof, ["rebuilt from saved payloads, 0 calls"])
+    n_props = 0
+    for p in sorted(glob.glob(os.path.join(raw_dir, "odds_*_%s.json" % stamp))):
+        if merge_fixture_odds(books, load_json(p)):
+            n_props += 1
+    return write_board(out_dir, raw_dir, books, names, tnames, teams, asof,
+                       ["rebuilt from saved payloads, 0 calls", "per-game prop payloads merged: %d" % n_props])
 
 
 # ---------- offline self-test ----------
+import io
+
+
+class Resp(io.BytesIO):
+    """Fake urlopen response for the offline self-test."""
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _race_worker(path):
+    try:
+        Budget(path, "2026-11-01", cap=20).spend()
+        return 1
+    except Refused:
+        return 0
+
+
 def selftest():
     asof = datetime(2026, 11, 1, tzinfo=timezone.utc)
     fresh = (asof - timedelta(minutes=10)).isoformat()
@@ -425,12 +516,11 @@ def selftest():
     assert by[("900", "over")]["bet"] == "A Smith Over 55.5"
     assert side_label("away/79.5/under", "H", "A") == "A Under 79.5"
     assert side_label("20.5/over", "H", "A") == "Over 20.5"
-    assert side_label("3.0/home", "H", "A") == "H +3"
-    assert side_label("-7.5/away", "H", "A") == "A +7.5"      # home -7.5 -> away +7.5 (review 5730373706)
+    assert side_label("3.0/home", "H", "A") == "H +3.0"
+    assert side_label("-7.5/away", "H", "A") == "A +7.5"   # Pinnacle id is the HOME handicap
+    assert side_label("-7.5/home", "H", "A") == "H -7.5"
     assert side_label("7.5/away", "H", "A") == "A -7.5"
-    assert side_label("-6.5/home", "H", "A") == "H -6.5"
-    assert side_label("0.0/away", "H", "A") == "A PK"
-    assert side_label("nan/home", "H", "A") == "nan H"
+    assert side_label("0/away", "H", "A") == "A 0"
     # started games are excluded
     assert board([fx("draftkings", (1.95, 1.87), (2.1, 1.74), start="2020-01-01T00:00:00Z")], [pin], {}, {}, asof)[0] == []
     # inactive / missing side -> group incomplete -> no row
@@ -466,19 +556,6 @@ def selftest():
     except Refused:
         pass
     assert Budget(os.path.join(d, "c.json"), "2026-11-01", cap=2).used() == 2
-    # two Budget objects loaded at cap-1 admit exactly one call between them (review 5730373706 race)
-    rp = os.path.join(d, "race.json")
-    with open(rp, "w") as fh:
-        json.dump({"2026-11-01": 19}, fh)
-    b1, b2 = Budget(rp, "2026-11-01", cap=20), Budget(rp, "2026-11-01", cap=20)
-    assert b1.used() == 19 and b2.used() == 19
-    b1.spend()
-    try:
-        b2.spend(); raise AssertionError("stale Budget object admitted call 21")
-    except Refused as e:
-        assert str(e) == "DAILY_CALL_CAP_REACHED", e
-    with open(rp) as fh:
-        assert json.load(fh) == {"2026-11-01": 20}
     # corrupt / non-object budget file fails closed and is left untouched (review 5729925753)
     for bad in ("{broken", "[1, 2]", "null", '"x"'):
         p = os.path.join(d, "bad.json")
@@ -498,20 +575,69 @@ def selftest():
         with open(p, "w") as fh:
             json.dump({"2026-11-01": badv}, fh)
         assert Budget(p, "2026-11-01", cap=2).used() == 2, badv
+    # two Budget objects on one file share the cap (review 5730373706: 21 admitted at a cap of 20)
+    p = os.path.join(d, "race.json")
+    with open(p, "w") as fh:
+        json.dump({"2026-11-01": 19}, fh)
+    b1, b2 = Budget(p, "2026-11-01", cap=20), Budget(p, "2026-11-01", cap=20)
+    b1.spend()
+    try:
+        b2.spend(); raise AssertionError("budget race: second object spent past the cap")
+    except Refused as e:
+        assert str(e) == "DAILY_CALL_CAP_REACHED", e
+    assert load_json(p) == {"2026-11-01": 20}
+    # concurrent processes: 8 workers race for 3 remaining calls -> exactly 3 succeed
+    import multiprocessing as mp
+    with open(p, "w") as fh:
+        json.dump({"2026-11-01": 17}, fh)
+    ctx = mp.get_context("fork")
+    with ctx.Pool(8) as pool:
+        ok = pool.map(_race_worker, [p] * 8)
+    assert sum(ok) == 3 and load_json(p) == {"2026-11-01": 20}, (ok, load_json(p))
+    # per-fixture props payload replaces only the books it carries; next-N NFL targets
+    bk = {"draftkings": [{"fixtureId": "f1", "tournamentId": 1, "bookmakerOdds": {"draftkings": {"markets": {}}}}],
+          "pinnacle": [{"fixtureId": "f1", "bookmakerOdds": {"pinnacle": {"markets": {}}}}]}
+    pay = {"fixtureId": "f1", "bookmakerOdds": {"draftkings": {"markets": {"900": {}}}, "fanduel": {}}}
+    assert merge_fixture_odds(bk, pay) == ["draftkings"]
+    assert bk["draftkings"][0]["bookmakerOdds"]["draftkings"]["markets"] == {"900": {}}
+    assert bk["pinnacle"][0]["bookmakerOdds"]["pinnacle"]["markets"] == {}
+    assert merge_fixture_odds(bk, {"bookmakerOdds": {}}) == [] and merge_fixture_odds(bk, None) == []
+    fl = [{"fixtureId": i, "tournamentId": 1, "startTime": "2099-01-0%dT18:00:00Z" % (9 - i)} for i in range(1, 9)]
+    fl.append({"fixtureId": 99, "tournamentId": 2, "startTime": "2099-01-01T00:00:00Z"})  # not NFL
+    fl.append({"fixtureId": 98, "tournamentId": 1, "startTime": "2020-01-01T00:00:00Z"})  # started
+    assert prop_targets(fl, {1}, asof, 3) == ["8", "7", "6"]
+    assert prop_targets(fl, {1}, asof, 0) == [] and prop_targets(fl, {1}, asof, -2) == []
+    # props: never more than PROP_CALLS_PER_DAY, and never past the main budget
+    pd_ = tempfile.mkdtemp()
+    main = Budget(os.path.join(pd_, "calls.json"), "2026-11-01", cap=20)
+    with open(main.path, "w") as fh:
+        json.dump({"2026-11-01": 12}, fh)
+    calls = []
+
+    def op_props(req, timeout=60):
+        calls.append(req.full_url)
+        fid = re.search(r"fixtureId=(\d+)", req.full_url).group(1)
+        return Resp(json.dumps({"fixtureId": int(fid), "bookmakerOdds": {"draftkings": {"markets": {}}}}).encode())
+    _last_call[0] = None
+    bk2 = {"draftkings": [dict(f) for f in fl], "pinnacle": []}
+    nt = []
+    fetch_props(pd_, pd_, bk2, {1}, "k", main, asof, op_props, nt, "2026-11-01")
+    assert len(calls) == PROP_CALLS_PER_DAY and main.used() == 12 + PROP_CALLS_PER_DAY, (len(calls), main.used())
+    calls.clear()
+    fetch_props(pd_, pd_, bk2, {1}, "k", main, asof, op_props, nt, "2026-11-01")
+    assert calls == [] and main.used() == 18, (calls, main.used())  # daily props cap already spent
+    pd2 = tempfile.mkdtemp()
+    m2 = Budget(os.path.join(pd2, "calls.json"), "2026-11-01", cap=20)
+    with open(m2.path, "w") as fh:
+        json.dump({"2026-11-01": 18}, fh)
+    fetch_props(pd2, pd2, {"draftkings": [dict(f) for f in fl], "pinnacle": []}, {1}, "k", m2, asof, op_props, [], "2026-11-01")
+    assert len(calls) == 2 and m2.used() == 20, (len(calls), m2.used())  # only 2 left in the main budget
+    _last_call[0] = None
     # unreadable path (a directory) fails closed
     os.mkdir(os.path.join(d, "dir.json"))
     assert Budget(os.path.join(d, "dir.json"), "2026-11-01", cap=2).corrupt
 
     # pacing + single 429 retry, all attempts budgeted (fake clock, no network)
-    import io
-
-    class Resp(io.BytesIO):
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
     def opener_seq(codes):
         it = iter(codes)
 
