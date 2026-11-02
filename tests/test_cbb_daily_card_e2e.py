@@ -49,9 +49,10 @@ def test_end_to_end_card(tmp_path):
     assert set(recs) == {"SPREAD", "TOTAL"}
     rows = card_rows(priced, fixtures)
     for r in rows:
-        assert r["ev"] > 0 and r["market"] in recs
+        assert r["market"] in recs and r["bucket"] != "REFUSED"
         rec = recs[r["market"]]
         assert rec["classification"] == "PICKED"
     md = render_card_markdown(rows, DATE, priced, notes, "Ratings: test vintage.")
     assert "CBB card" in md and "Liberty margin: model" in md and "vs market -7.5" in md
+    assert all(r["counted"] is False and r["label"] == "NON_COUNTED" for r in rows)
     print(md)
