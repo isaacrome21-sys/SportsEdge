@@ -1,0 +1,114 @@
+name: nfl-lines-issue
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+cache-mode: write
+
+concurrency:
+  group: nfl-lines-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  card:
+    if: github.actor == github.repository_owner && (contains(github.event.issue.labels.*.name, 'nfl-lines') || startsWith(github.event.issue.title, '[NFL LINES]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      # The full-board renderer imports the core simulation package, which requires NumPy.
+      # Install the repo's pinned requirements before the fast issue-card path.
+      - name: Install pinned phone-board dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-test.txt
+      - name: Verify phone-board import
+        run: python -c 'from sportsedge.football_full_board import board_from_machine_results, catalog_complete; print("NFL_PHONE_BOARD_IMPORT_OK")'
+      - name: Slate date
+        id: day
+        run: echo "date=$(TZ=America/Chicago date +%F)" >> "$GITHUB_OUTPUT"
+
+      # Reuse strictly-prior NFL history for the rest of the Chicago-local day.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .cache/nfl-history
+          key: nfl-lines-history-v2-${{ runner.os }}-${{ steps.day.outputs.date }}
+
+      - name: Fast intake, price, render, reply
+        id: intake
+        env:
+          BODY: ${{ github.event.issue.body }}
+          OBSERVED: ${{ github.event.issue.updated_at }}
+        run: |
+          set -euo pipefail
+          started=$(date +%s)
+          printf '%s' "$BODY" > issue_body.txt
+          if PYTHONPATH=. python scripts/intake_nfl_lines_issue.py --body-file issue_body.txt \
+               --observed-at "$OBSERVED" --issue "$ISSUE" > intake.out; then
+            cat intake.out >> "$GITHUB_OUTPUT"
+          else
+            { echo "Couldn't read these lines, so no card was run:"; echo; echo '```'; cat intake_error.txt; echo '```'; } > fail.md
+            gh issue comment "$ISSUE" --body-file fail.md
+            exit 1
+          fi
+
+          input_path=$(awk -F= '/^path=/{print $2}' intake.out)
+          mkdir -p .cache/nfl-history artifacts
+          if [[ ! -s .cache/nfl-history/nflverse_games.json ]]; then
+            if ! PYTHONPATH=. python scripts/fetch_nflverse_games.py --output .cache/nfl-history/nflverse_games.json; then
+              echo "NFL_HISTORY_FETCH_UNAVAILABLE: the DK quote board will still render; model features remain MISSING."
+            fi
+          fi
+
+          # #2 (owner ruling Nov 1 2026): player props through the canonical
+          # RUN IT path (artifacts/run_it_full.py) NFL research lane. Runs
+          # first so the 180 s quote clock is as close to capture as possible.
+          # A props failure never blocks the game-line card below.
+          if PYTHONPATH=. python scripts/run_nfl_props_card.py --input "$input_path" \
+               --out-dir artifacts/nfl_props --as-of "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+               --fetch-espn-schedule; then
+            gh issue comment "$ISSUE" --body-file artifacts/nfl_props/props_card.md
+          else
+            gh issue comment "$ISSUE" --body "NFL props card failed (game-line card still runs). Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+
+          # No synthetic games or scoring history. If the public source is
+          # unavailable, run the existing model in its NO_MODEL/no-history mode.
+          # Pricing clock is this run's time, never the issue edit time. Kickoff
+          # comes only from the ESPN public schedule (exactly one match).
+          nfl_args=(--input "$input_path" --output artifacts/nfl_phone_card.json \
+                    --as-of "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --fetch-espn-schedule)
+          if [[ -s .cache/nfl-history/nflverse_games.json ]]; then
+            nfl_args+=(--history .cache/nfl-history/nflverse_games.json)
+          fi
+          PYTHONPATH=. python scripts/run_nfl_lines_card.py "${nfl_args[@]}"
+          PYTHONPATH=. python scripts/render_nfl_myspari_card.py \
+            --engine-output artifacts/nfl_phone_card.json \
+            --snapshot "$input_path" \
+            --pre-context \
+            --out-dir artifacts/nfl_myspari
+          gh issue comment "$ISSUE" --body-file artifacts/nfl_myspari/card.md
+          echo "phone_card_seconds=$(( $(date +%s) - started ))"
+      - name: Report engine failure
+        if: failure() && steps.intake.outcome == 'success'
+        run: |
+          gh issue comment "$ISSUE" --body "The NFL card run failed after intake. Run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nfl-lines-issue-${{ github.event.issue.number }}
+          path: |
+            manual_inputs/nfl/*_issue*.json
+            artifacts/
+          if-no-files-found: warn

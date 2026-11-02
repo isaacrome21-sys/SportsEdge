@@ -16,12 +16,16 @@ NOW = datetime(2026, 10, 13, 18, 0, tzinfo=timezone.utc)
 PRICE_KEYS = {"model_p", "probability", "fair_odds", "ev_per_dollar",
               "fair_price", "model_probability", "edge"}
 
-NFL_PROPS = ["PLAYER_PASSING_YARDS", "PASS_YARDS", "PLAYER_RUSHING_YARDS",
-             "RUSH_YARDS", "PLAYER_RECEIVING_YARDS", "REC_YARDS",
-             "PLAYER_RECEPTIONS", "RECEPTIONS", "PLAYER_COMPLETIONS",
-             "COMPLETIONS", "PLAYER_PASS_ATTEMPTS", "PLAYER_PASS_TDS",
-             "PASSING_TDS", "PLAYER_INTERCEPTIONS", "INTERCEPTIONS",
-             "PLAYER_RUSH_ATTEMPTS", "ANYTIME_TD", "ANYTIME_TOUCHDOWN",
+# Owner ruling (Nov 1 2026, sportsedge.nfl_prop_research_admission): these
+# NFL empirical-pricer markets now reach the NFL research lane and are
+# re-judged there; see test_nfl_admitted_props_fail_closed_without_sufficiency.
+NFL_ADMITTED_PROPS = ["PLAYER_PASSING_YARDS", "PASS_YARDS", "PLAYER_RUSHING_YARDS",
+                      "RUSH_YARDS", "PLAYER_RECEIVING_YARDS", "REC_YARDS",
+                      "PLAYER_RECEPTIONS", "RECEPTIONS", "PLAYER_COMPLETIONS",
+                      "COMPLETIONS", "PLAYER_PASS_ATTEMPTS", "PLAYER_PASS_TDS",
+                      "PASSING_TDS", "PLAYER_INTERCEPTIONS", "INTERCEPTIONS",
+                      "PLAYER_RUSH_ATTEMPTS"]
+NFL_PROPS = ["ANYTIME_TD", "ANYTIME_TOUCHDOWN",
              "ANYTIME_TD_SCORER", "FIRST_TD", "FIRST_TD_SCORER", "TARGETS",
              "PLAYER_SACKS", "TACKLES_ASSISTS", "FG_MADE", "KICKING_POINTS",
              "XP_MADE", "TWO_PLUS_TD"]
@@ -84,6 +88,28 @@ def test_nfl_blocked_markets_never_reach_pricer(no_pricers, market):
     assert card["prop_candidates"] == [] and card["prop_watchlist"] == []
 
 
+@pytest.mark.parametrize("market", NFL_ADMITTED_PROPS)
+def test_nfl_admitted_props_fail_closed_without_sufficiency(no_pricers, monkeypatch, market):
+    """Admitted markets reach ONLY the NFL empirical lane; untrusted intake
+    probabilities never survive, and a pricer row without the engine's
+    sufficiency stamp is replaced by the original NO_ENGINE blocker."""
+    seen = []
+
+    def lane(rows, *a, **k):
+        seen.extend(rows)
+        return [{"status": "NO_MODEL_OR_MARKET", "reason": "TEST_NO_HISTORY",
+                 "sport": "NFL", "market": r["market"]} for r in rows], []
+    monkeypatch.setattr(R, "phone_nfl_player_rows", lane)
+    card = R.run_full({"lines": [_row("NFL", market)]}, now=NOW,
+                      auto_context=False)
+    assert len(seen) == 1
+    row = card["evaluated_rows"][0]
+    _assert_blocked(row, "NFL", market)
+    assert row["blocker"] == "NO_ENGINE"
+    assert row["nfl_prop_engine_reason"] == "TEST_NO_HISTORY"
+    assert card["prop_candidates"] == [] and card["prop_watchlist"] == []
+
+
 @pytest.mark.parametrize("market", MLB_TARGETS)
 def test_mlb_blocked_markets_never_reach_pricer(no_pricers, market):
     card = R.run_full({"lines": [_row("MLB", market)]}, now=NOW,
@@ -114,7 +140,13 @@ def test_default_sport_payload_cannot_dodge(no_pricers):
     _assert_blocked(card["evaluated_rows"][0], "MLB", "STOLEN_BASES")
 
 
-def test_every_blocked_registry_key_and_alias_fails_closed(no_pricers):
+def test_every_blocked_registry_key_and_alias_fails_closed(no_pricers, monkeypatch):
+    # NFL empirical-pricer markets reach the admitted research lane (owner
+    # ruling Nov 1 2026); with no sufficiency stamp they must still land on
+    # their registry blocker.
+    monkeypatch.setattr(R, "phone_nfl_player_rows", lambda rows, *a, **k: ([
+        {"status": "NO_MODEL_OR_MARKET", "reason": "TEST_NO_HISTORY",
+         "sport": "NFL", "market": r["market"]} for r in rows], []))
     names = [(s, m) for (s, m), r in MARKET_RESOLUTIONS.items()
              if r["state"] == BLOCKED]
     names += [(s, a) for s, al in INTAKE_ALIASES.items()
