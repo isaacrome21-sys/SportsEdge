@@ -40,6 +40,8 @@ def _ticket(total: dict | None = None) -> dict:
                      "raw": "TeamTotal Ravens 10.5 -110 -110", "team": "BAL", "player": None},
                     {"market": "pass_yards", "line": 245.5, "away_or_over_price": -110, "home_or_under_price": -110,
                      "raw": 'Prop "Lamar Jackson" PassYards 245.5 -110 -110', "team": None, "player": "Lamar Jackson"},
+                    {"market": "pass_yards", "line": 265.5, "away_or_over_price": -110, "home_or_under_price": -110,
+                     "raw": 'Prop "Patrick Mahomes" PassYards 265.5 -110 -110', "team": None, "player": "Patrick Mahomes"},
                 ],
             }
         ],
@@ -51,10 +53,15 @@ def _ticket(total: dict | None = None) -> dict:
 
 
 class NflCardLeanTests(unittest.TestCase):
-    def _run(self, history: list[dict] | None = None, total: dict | None = None) -> tuple[dict, str]:
+    def _run(self, history: list[dict] | None = None, total: dict | None = None,
+             drop_player: str | None = None) -> tuple[dict, str]:
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
-            (t / "ticket.json").write_text(json.dumps(_ticket(total)), encoding="utf-8")
+            ticket = _ticket(total)
+            if drop_player:
+                for g in ticket["games"]:
+                    g["markets"] = [m for m in g["markets"] if m.get("player") != drop_player]
+            (t / "ticket.json").write_text(json.dumps(ticket), encoding="utf-8")
             (t / "hist.json").write_text(json.dumps(_history() if history is None else history), encoding="utf-8")
             env = {"PYTHONPATH": str(ROOT)}
             subprocess.run(
@@ -157,6 +164,49 @@ class NflCardLeanTests(unittest.TestCase):
         engine, md = self._run(hist)
         self.assertEqual(engine["games"][0]["context"]["qb_change_flag"], ["Lamar Jackson"])
         self.assertIn("QB check: DK has passing props for Lamar Jackson", md)
+
+    def test_qb_change_blocks_side_total_ml_leans(self):
+        hist = _history()
+        for g in hist:
+            if g["home"] == "BAL":
+                g["home_qb"] = "Tyler Huntley"
+        engine, md = self._run(hist)
+        game = engine["games"][0]
+        assert game["context"]["qb_change_flag"]
+        mains = [m for m in game["markets"] if m.get("residual_mode")]
+        self.assertTrue(mains)
+        for m in mains:
+            self.assertIsNone(m["lean"])
+            self.assertEqual(m["lean_block"], "NO_LEAN:QB_CHANGE_UNMODELED")
+        self.assertEqual(game["leans"], [])
+        self.assertIn("QB change: the model was built on a different starter", md)
+
+    def test_no_qb_change_no_block(self):
+        engine, _ = self._run()
+        for m in engine["games"][0]["markets"]:
+            if m.get("residual_mode"):
+                self.assertIsNone(m.get("lean_block"))
+
+    def test_qb_unverified_blocks_when_a_starter_has_no_prop(self):
+        hist = _history()
+        for g in hist:
+            if g["home"] == "KC":
+                g["home_qb"] = "Patrick Mahomes"
+        engine, md = self._run(hist, drop_player="Patrick Mahomes")
+        game = engine["games"][0]
+        self.assertFalse(game["context"].get("qb_change_flag"))
+        self.assertEqual(game["context"]["qb_verified"]["KC"], False)
+        for m in game["markets"]:
+            if m.get("residual_mode"):
+                self.assertIsNone(m["lean"])
+                self.assertEqual(m["lean_block"], "NO_LEAN:QB_STARTER_UNVERIFIED")
+        self.assertIn("starting QBs not confirmed", md)
+
+    def test_qb_unverified_blocks_without_history(self):
+        engine, _ = self._run([])
+        for m in engine["games"][0]["markets"]:
+            if m.get("residual_mode"):
+                self.assertIsNone(m["lean"])
 
     def test_no_why_section_without_history_facts(self):
         _, md = self._run([])

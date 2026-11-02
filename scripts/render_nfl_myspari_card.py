@@ -244,6 +244,10 @@ def render(engine: dict, first_card: dict | None = None, observed_at: str | None
             else:
                 if row.get("lean_block") == "NO_LEAN:THIN_CALIBRATION":
                     why = "model too far from the line; too few past games to price it"
+                elif row.get("lean_block") == "NO_LEAN:QB_CHANGE_UNMODELED":
+                    why = "QB change: the model was built on a different starter"
+                elif row.get("lean_block") == "NO_LEAN:QB_STARTER_UNVERIFIED":
+                    why = "starting QBs not confirmed on the board (paste both QBs' props)"
                 elif row.get("lean_block") == "NO_LEAN:PROJECTION_DISAGREES":
                     why = "price-only edge; the model total points the other way"
                 else:

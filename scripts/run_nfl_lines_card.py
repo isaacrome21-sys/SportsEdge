@@ -49,6 +49,17 @@ def _ev(estimate_p: float, price: int) -> float:
 MIN_CALIBRATION_BLOCK_WEIGHT = 20
 LEAN_BLOCK_THIN = "NO_LEAN:THIN_CALIBRATION"
 LEAN_BLOCK_DIRECTION = "NO_LEAN:PROJECTION_DISAGREES"
+# The frozen Attempt 9 features are built from the team's recent games under
+# its LAST LISTED starter. When DK's QB props name a passer who is not either
+# team's last starter, the projection describes a different offense than the
+# one taking the field; a lean on that game's side/total/ML would be priced
+# on the wrong QB. Card-side guard only; the frozen artifact is untouched.
+LEAN_BLOCK_QB_CHANGE = "NO_LEAN:QB_CHANGE_UNMODELED"
+# Owner requirement (Nov 1, 2026, relay #2447): leans also block when the
+# starter CANNOT be verified -- i.e. unless, for BOTH teams, the model's last
+# listed starter is corroborated by a DK QB prop on the pasted board. No
+# scoring adjustment is ever invented for a QB change.
+LEAN_BLOCK_QB_UNVERIFIED = "NO_LEAN:QB_STARTER_UNVERIFIED"
 
 
 def _calibration_block_weight(artifact: dict, market: str, raw_p: float) -> int:
@@ -151,7 +162,23 @@ def game_context(game: dict, history: list, asof: date, feat: dict, forecast: di
             unmatched = [n for n in prop_qbs if _name_key(n) not in known]
             if unmatched:
                 ctx["qb_change_flag"] = unmatched
+    prop_keys = {_name_key(n) for n in prop_qbs}
+    ctx["qb_verified"] = {
+        team: bool(team in qbs and _name_key(qbs[team]["qb"]) in prop_keys)
+        for team in (away, home)
+    }
     return ctx
+
+
+def qb_lean_block(ctx: dict) -> str | None:
+    """CHANGE when a DK QB prop names a non-last-starter; UNVERIFIED unless
+    both teams' last listed starters are corroborated by DK QB props."""
+    if ctx.get("qb_change_flag"):
+        return LEAN_BLOCK_QB_CHANGE
+    verified = ctx.get("qb_verified") or {}
+    if len(verified) != 2 or not all(verified.values()):
+        return LEAN_BLOCK_QB_UNVERIFIED
+    return None
 
 
 def _board_rows_from_games(games: list) -> list[dict]:
@@ -298,6 +325,8 @@ def main() -> int:
         elif residual_error is None:
             residual_error = str(feat.get("reason") or "NO_PRIOR_MODEL_HISTORY")
 
+        context = game_context(game, history, asof, feat, forecast)
+        qb_block = qb_lean_block(context)
         for raw in game.get("markets") or []:
             key = str(raw.get("market") or "").lower()
             if key not in {"moneyline", "spread", "total"}:
@@ -325,6 +354,9 @@ def main() -> int:
                 and abs(adjustment) >= float(residual_policy["forward_track_min_abs_adjustment_points"])
             ]
             lean = max(qualified, key=lambda x: (x["ev_per_dollar"], x["edge_probability_points"])) if qualified else None
+            lean_block = None
+            if qb_block:
+                lean, lean_block = None, qb_block
             if lean:
                 lean = {**lean, "lean_only": True,
                         "lean_reason": "RESEARCH_ONLY:MARKET_ANCHORED_RESIDUAL_FORWARD_CLV_PENDING",
@@ -336,10 +368,10 @@ def main() -> int:
                         })}
                 leans.append(lean)
             markets.append({**raw, "no_model": None, "pick": None, "lean": lean,
+                            "lean_block": lean_block,
                             "residual_mode": True,
                             "residual_research_prices": choices,
                             "residual_research_adjustment": adjustment})
-        context = game_context(game, history, asof, feat, forecast)
         games_out.append({**game, "markets": markets, "picks": picks, "leans": leans,
                           "residual_research_prices": residual_rows,
                           "residual_research_error": residual_error,
