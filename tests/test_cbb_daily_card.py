@@ -200,3 +200,41 @@ def test_r7_owner_option_a_banner_on_nonempty_card():
     assert md.count("NOT COUNTED · PAPER / 0u · NO PLAY") == 1
     assert md.index("NO PLAY") < md.index("Under 155.5")      # banner above all rows
     assert "★" in md and "EV +" in md and " plays" not in md
+
+
+# ---- opening-night slate-date convention (relay #2447, 2026-11-02 05:00Z) ----
+
+OPENER = [{
+    "id": "401800001", "date": "2026-11-02T05:00Z",    # 12:00 AM ET Nov 2 = 11:00 PM CT Nov 1
+    "competitions": [{"neutralSite": True, "competitors": [
+        _comp("home", "2335", "Liberty Flames", "Liberty", "LIB"),
+        _comp("away", "2272", "High Point Panthers", "High Point", "HPU")]}],
+}]
+
+
+def test_r8_midnight_et_opener_is_on_the_eastern_slate_date():
+    board = {"games": [{"away": "High Point Panthers", "home": "Liberty Flames"}]}
+    fx, notes = fixtures_from_espn(board, OPENER, "2026-11-02")
+    assert notes == [] and fx["High Point Panthers@Liberty Flames"]["espn_event_id"] == "401800001"
+    assert fx["High Point Panthers@Liberty Flames"]["tip_utc"] == "2026-11-02T05:00+00:00"
+    # Same game is NOT on the CT calendar date's slate
+    fx, notes = fixtures_from_espn(board, OPENER, "2026-11-01")
+    assert fx == {} and "no ESPN game found on 2026-11-01" in notes[0]
+
+
+def test_r8_supplied_opener_id_corroborated_on_eastern_date():
+    board = {"games": [{"away": "High Point Panthers", "home": "Liberty Flames",
+                        "espn_event_id": "401800001"}]}
+    fx, notes = fixtures_from_espn(board, OPENER, "2026-11-02")
+    assert notes == [] and len(fx) == 1
+    fx, notes = fixtures_from_espn(board, OPENER, "2026-11-01")
+    assert fx == {} and "ESPN_EVENT_DATE_MISMATCH" in notes[0]
+
+
+def test_r8_opener_renders_its_ct_tip_time():
+    from sportsedge.cbb_daily_card import SLATE_TZ
+    assert str(SLATE_TZ) == "America/New_York"
+    rows = card_rows(_P(_rec("TOTAL", -4.6, "UNDER", 155.5, a=-105, b=-115, model=150.9,
+                             tip_utc="2026-11-02T05:00:00+00:00")), _fx())
+    md = render_card_markdown(rows, "2026-11-02", {"records": [1]}, [], "v")
+    assert "11:00 PM CT" in md
